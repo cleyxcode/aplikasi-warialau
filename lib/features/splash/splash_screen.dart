@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:lottie/lottie.dart';
 import '../../core/constants/app_colors.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -197,14 +198,14 @@ class _SplashScreenState extends State<SplashScreen>
                       _pulseRing(0.25, 0.9, 160),
                       _pulseRing(0.5, 1.0, 130),
 
-                      // Logo circle
+                      // Logo circle with Lottie animation
                       ScaleTransition(
                         scale: _logoScale,
                         child: FadeTransition(
                           opacity: _logoFade,
                           child: Container(
-                            width: 116,
-                            height: 116,
+                            width: 140,
+                            height: 140,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
                               color: AppColors.white,
@@ -223,10 +224,12 @@ class _SplashScreenState extends State<SplashScreen>
                             ),
                             child: ClipOval(
                               child: Padding(
-                                padding: const EdgeInsets.all(14),
-                                child: Image.network(
-                                  'https://lh3.googleusercontent.com/aida-public/AB6AXuAszatERUl6AuXqbahV1RqucUb0ZE49etzQvQlrjSWuW17luulHa2a6IRSE3JgZ6qWHa-JebTyBxxZgQkUKMrx4pk7tTGuw2iNk79m2xshQB89BcXN_hmLLp_L0Wif17jltORwtyVkHFZw_EXl7WpTNR3pHbBGW-kPMyNewVWc6rN2mrliG1riFIhYBT5rN-_zjLP8_CxMAvWozrjMDWAMN1XelgTZ5N52svBDps8YbThuDteUEjnZ_9hBj-nkE_GN7r9OTUVouwc6p',
+                                padding: const EdgeInsets.all(10),
+                                child: Lottie.asset(
+                                  'lib/animations/iconSplash.json',
                                   fit: BoxFit.contain,
+                                  animate: true,
+                                  repeat: true,
                                   errorBuilder: (_, __, ___) => const Icon(
                                     Icons.school_rounded,
                                     size: 64,

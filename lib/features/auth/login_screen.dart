@@ -22,11 +22,9 @@ class _LoginScreenState extends State<LoginScreen>
   bool _isLoading = false;
   bool _showRocket = false;
 
-  // Header decoration animation (floating circle)
   late AnimationController _decoreCtrl;
   late Animation<double> _decoreY;
 
-  // Form stagger
   late AnimationController _formCtrl;
   late Animation<double> _field1Fade;
   late Animation<Offset> _field1Slide;
@@ -39,16 +37,15 @@ class _LoginScreenState extends State<LoginScreen>
   void initState() {
     super.initState();
 
-    // Floating decor
     _decoreCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 3000),
     )..repeat(reverse: true);
-    _decoreY = Tween<double>(begin: -10, end: 10).animate(
-      CurvedAnimation(parent: _decoreCtrl, curve: Curves.easeInOut),
-    );
+    _decoreY = Tween<double>(
+      begin: -10,
+      end: 10,
+    ).animate(CurvedAnimation(parent: _decoreCtrl, curve: Curves.easeInOut));
 
-    // Staggered form fields
     _formCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 700),
@@ -56,36 +53,45 @@ class _LoginScreenState extends State<LoginScreen>
 
     _field1Fade = Tween<double>(begin: 0, end: 1).animate(
       CurvedAnimation(
-          parent: _formCtrl, curve: const Interval(0.0, 0.5, curve: Curves.easeOut)),
-    );
-    _field1Slide = Tween<Offset>(
-      begin: const Offset(0, 0.3),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(
         parent: _formCtrl,
-        curve: const Interval(0.0, 0.5, curve: Curves.easeOut)));
+        curve: const Interval(0.0, 0.5, curve: Curves.easeOut),
+      ),
+    );
+    _field1Slide = Tween<Offset>(begin: const Offset(0, 0.3), end: Offset.zero)
+        .animate(
+          CurvedAnimation(
+            parent: _formCtrl,
+            curve: const Interval(0.0, 0.5, curve: Curves.easeOut),
+          ),
+        );
 
     _field2Fade = Tween<double>(begin: 0, end: 1).animate(
       CurvedAnimation(
-          parent: _formCtrl, curve: const Interval(0.2, 0.7, curve: Curves.easeOut)),
-    );
-    _field2Slide = Tween<Offset>(
-      begin: const Offset(0, 0.3),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(
         parent: _formCtrl,
-        curve: const Interval(0.2, 0.7, curve: Curves.easeOut)));
+        curve: const Interval(0.2, 0.7, curve: Curves.easeOut),
+      ),
+    );
+    _field2Slide = Tween<Offset>(begin: const Offset(0, 0.3), end: Offset.zero)
+        .animate(
+          CurvedAnimation(
+            parent: _formCtrl,
+            curve: const Interval(0.2, 0.7, curve: Curves.easeOut),
+          ),
+        );
 
     _btnFade = Tween<double>(begin: 0, end: 1).animate(
       CurvedAnimation(
-          parent: _formCtrl, curve: const Interval(0.45, 1.0, curve: Curves.easeOut)),
-    );
-    _btnSlide = Tween<Offset>(
-      begin: const Offset(0, 0.3),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(
         parent: _formCtrl,
-        curve: const Interval(0.45, 1.0, curve: Curves.easeOut)));
+        curve: const Interval(0.45, 1.0, curve: Curves.easeOut),
+      ),
+    );
+    _btnSlide = Tween<Offset>(begin: const Offset(0, 0.3), end: Offset.zero)
+        .animate(
+          CurvedAnimation(
+            parent: _formCtrl,
+            curve: const Interval(0.45, 1.0, curve: Curves.easeOut),
+          ),
+        );
 
     _formCtrl.forward();
   }
@@ -105,10 +111,7 @@ class _LoginScreenState extends State<LoginScreen>
     try {
       final response = await ApiService.instance.post(
         '/auth/login',
-        data: {
-          'email': _emailCtrl.text.trim(),
-          'password': _passCtrl.text,
-        },
+        data: {'email': _emailCtrl.text.trim(), 'password': _passCtrl.text},
       );
       if (!mounted) return;
       await StorageService.saveToken(response.data['token'] as String);
@@ -122,17 +125,23 @@ class _LoginScreenState extends State<LoginScreen>
     } on DioException catch (e) {
       if (!mounted) return;
       setState(() => _isLoading = false);
-      final msg = e.response?.data['message'] as String? ??
+      final msg =
+          e.response?.data['message'] as String? ??
           'Login gagal. Periksa koneksi Anda.';
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(msg,
-              style: GoogleFonts.plusJakartaSans(
-                  fontSize: 13, color: AppColors.white)),
+          content: Text(
+            msg,
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 13,
+              color: AppColors.white,
+            ),
+          ),
           backgroundColor: AppColors.danger,
           behavior: SnackBarBehavior.floating,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
         ),
       );
     }
@@ -175,98 +184,38 @@ class _LoginScreenState extends State<LoginScreen>
         ),
       );
     }
+
     return Scaffold(
       backgroundColor: AppColors.primary,
       resizeToAvoidBottomInset: true,
       body: Column(
         children: [
-          // ── Header (40%) ──
+          // ── Header (48%) ──
           Expanded(
-            flex: 40,
+            flex: 52,
             child: SafeArea(
               bottom: false,
               child: Stack(
                 alignment: Alignment.center,
                 children: [
-                  // Floating decoration circle 1
-                  AnimatedBuilder(
-                    animation: _decoreY,
-                    builder: (_, __) => Positioned(
-                      top: 10 + _decoreY.value,
-                      right: -30,
-                      child: Container(
-                        width: 120,
-                        height: 120,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Colors.white.withValues(alpha: 0.06),
-                        ),
-                      ),
-                    ),
-                  ),
-                  // Floating decoration circle 2
-                  AnimatedBuilder(
-                    animation: _decoreY,
-                    builder: (_, __) => Positioned(
-                      bottom: 0,
-                      left: -20,
-                      child: Container(
-                        width: 90,
-                        height: 90,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: AppColors.gold.withValues(alpha: 0.12),
-                        ),
-                      ),
-                    ),
-                  ),
-                  // Gold ring decor top-left
-                  Positioned(
-                    top: -10,
-                    left: 30,
-                    child: Container(
-                      width: 60,
-                      height: 60,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.08),
-                          width: 2,
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  // Center: icon + title
+                  // Center: Lottie icon + title
                   Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Container(
-                        width: 88,
-                        height: 88,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: AppColors.white,
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.2),
-                              blurRadius: 24,
-                              offset: const Offset(0, 8),
-                            ),
-                            BoxShadow(
-                              color: AppColors.gold.withValues(alpha: 0.15),
-                              blurRadius: 32,
-                              spreadRadius: 2,
-                            ),
-                          ],
-                        ),
-                        child: const Icon(
+                      Lottie.asset(
+                        'lib/animations/login.json',
+                        width: 270,
+                        height: 270,
+                        fit: BoxFit.contain,
+                        animate: true,
+                        repeat: true,
+                        errorBuilder: (_, __, ___) => const Icon(
                           Icons.school_rounded,
-                          size: 46,
-                          color: AppColors.primary,
+                          size: 100,
+                          color: Colors.white,
                         ),
                       ),
-                      const SizedBox(height: 14),
+                      const SizedBox(height: 10),
                       Text(
                         'SD Negeri Warialau',
                         style: GoogleFonts.plusJakartaSans(
@@ -278,7 +227,9 @@ class _LoginScreenState extends State<LoginScreen>
                       const SizedBox(height: 6),
                       Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 4),
+                          horizontal: 12,
+                          vertical: 4,
+                        ),
                         decoration: BoxDecoration(
                           color: AppColors.gold.withValues(alpha: 0.18),
                           borderRadius: BorderRadius.circular(999),
@@ -300,9 +251,9 @@ class _LoginScreenState extends State<LoginScreen>
             ),
           ),
 
-          // ── Form card (60%) ──
+          // ── Form card (48%) ──
           Expanded(
-            flex: 60,
+            flex: 48,
             child: Container(
               width: double.infinity,
               decoration: const BoxDecoration(
@@ -341,7 +292,7 @@ class _LoginScreenState extends State<LoginScreen>
                       ),
                       const SizedBox(height: 24),
 
-                      // Email field (stagger 1)
+                      // Email field
                       SlideTransition(
                         position: _field1Slide,
                         child: FadeTransition(
@@ -363,7 +314,8 @@ class _LoginScreenState extends State<LoginScreen>
                                   if (v == null || v.isEmpty) {
                                     return 'Email tidak boleh kosong';
                                   }
-                                  if (!v.contains('@')) return 'Email tidak valid';
+                                  if (!v.contains('@'))
+                                    return 'Email tidak valid';
                                   return null;
                                 },
                               ),
@@ -374,7 +326,7 @@ class _LoginScreenState extends State<LoginScreen>
 
                       const SizedBox(height: 18),
 
-                      // Password field (stagger 2)
+                      // Password field
                       SlideTransition(
                         position: _field2Slide,
                         child: FadeTransition(
@@ -411,13 +363,16 @@ class _LoginScreenState extends State<LoginScreen>
                                 alignment: Alignment.centerRight,
                                 child: TextButton(
                                   onPressed: () => Navigator.pushNamed(
-                                      context, '/forgot-password'),
+                                    context,
+                                    '/forgot-password',
+                                  ),
                                   style: TextButton.styleFrom(
                                     minimumSize: Size.zero,
                                     tapTargetSize:
                                         MaterialTapTargetSize.shrinkWrap,
-                                    padding:
-                                        const EdgeInsets.symmetric(vertical: 4),
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 4,
+                                    ),
                                   ),
                                   child: Text(
                                     'Lupa kata sandi?',
@@ -436,29 +391,31 @@ class _LoginScreenState extends State<LoginScreen>
 
                       const SizedBox(height: 20),
 
-                      // Button + footer (stagger 3)
+                      // Button + footer
                       SlideTransition(
                         position: _btnSlide,
                         child: FadeTransition(
                           opacity: _btnFade,
                           child: Column(
                             children: [
-                              // Masuk button
                               _PressableButton(
                                 onTap: _isLoading ? null : _handleLogin,
                                 child: Container(
                                   width: double.infinity,
                                   height: 52,
                                   decoration: BoxDecoration(
-                                    gradient: const LinearGradient(colors: [
-                                      Color(0xFF1F3B61),
-                                      Color(0xFF2D5A9B),
-                                    ]),
+                                    gradient: const LinearGradient(
+                                      colors: [
+                                        Color(0xFF1F3B61),
+                                        Color(0xFF2D5A9B),
+                                      ],
+                                    ),
                                     borderRadius: BorderRadius.circular(999),
                                     boxShadow: [
                                       BoxShadow(
-                                        color: AppColors.primary
-                                            .withValues(alpha: 0.35),
+                                        color: AppColors.primary.withValues(
+                                          alpha: 0.35,
+                                        ),
                                         blurRadius: 16,
                                         offset: const Offset(0, 6),
                                       ),
@@ -488,14 +445,15 @@ class _LoginScreenState extends State<LoginScreen>
 
                               const SizedBox(height: 24),
 
-                              // Divider
                               Row(
                                 children: [
                                   const Expanded(
-                                      child: Divider(color: AppColors.divider)),
+                                    child: Divider(color: AppColors.divider),
+                                  ),
                                   Padding(
                                     padding: const EdgeInsets.symmetric(
-                                        horizontal: 14),
+                                      horizontal: 14,
+                                    ),
                                     child: Text(
                                       'atau',
                                       style: GoogleFonts.plusJakartaSans(
@@ -505,13 +463,13 @@ class _LoginScreenState extends State<LoginScreen>
                                     ),
                                   ),
                                   const Expanded(
-                                      child: Divider(color: AppColors.divider)),
+                                    child: Divider(color: AppColors.divider),
+                                  ),
                                 ],
                               ),
 
                               const SizedBox(height: 18),
 
-                              // Register link
                               GestureDetector(
                                 onTap: () =>
                                     Navigator.pushNamed(context, '/register'),
@@ -521,10 +479,9 @@ class _LoginScreenState extends State<LoginScreen>
                                       fontSize: 14,
                                       color: AppColors.textSecondary,
                                     ),
-                                    children: [
-                                      const TextSpan(
-                                          text: 'Belum punya akun? '),
-                                      const TextSpan(
+                                    children: const [
+                                      TextSpan(text: 'Belum punya akun? '),
+                                      TextSpan(
                                         text: 'Daftar Sekarang',
                                         style: TextStyle(
                                           color: AppColors.gold,
@@ -561,19 +518,17 @@ class _LoginScreenState extends State<LoginScreen>
     );
   }
 
-  TextStyle _fieldTextStyle() => GoogleFonts.plusJakartaSans(
-        fontSize: 14,
-        color: AppColors.textPrimary,
-      );
+  TextStyle _fieldTextStyle() =>
+      GoogleFonts.plusJakartaSans(fontSize: 14, color: AppColors.textPrimary);
 
   Widget _label(String text) => Text(
-        text,
-        style: GoogleFonts.plusJakartaSans(
-          fontSize: 13,
-          fontWeight: FontWeight.w600,
-          color: AppColors.textPrimary,
-        ),
-      );
+    text,
+    style: GoogleFonts.plusJakartaSans(
+      fontSize: 13,
+      fontWeight: FontWeight.w600,
+      color: AppColors.textPrimary,
+    ),
+  );
 
   InputDecoration _inputDec({
     required String hint,
@@ -583,30 +538,33 @@ class _LoginScreenState extends State<LoginScreen>
     return InputDecoration(
       hintText: hint,
       hintStyle: GoogleFonts.plusJakartaSans(
-          color: AppColors.textLight, fontSize: 14),
+        color: AppColors.textLight,
+        fontSize: 14,
+      ),
       prefixIcon: Icon(icon, color: AppColors.textLight, size: 20),
       filled: true,
       fillColor: AppColors.inputBg,
       border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide.none),
+        borderRadius: BorderRadius.circular(14),
+        borderSide: BorderSide.none,
+      ),
       enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide.none),
+        borderRadius: BorderRadius.circular(14),
+        borderSide: BorderSide.none,
+      ),
       focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide:
-              const BorderSide(color: AppColors.primary, width: 1.5)),
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+      ),
       errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide:
-              const BorderSide(color: AppColors.danger, width: 1.5)),
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: AppColors.danger, width: 1.5),
+      ),
       focusedErrorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide:
-              const BorderSide(color: AppColors.danger, width: 1.5)),
-      contentPadding:
-          const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: AppColors.danger, width: 1.5),
+      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       suffixIcon: suffix,
     );
   }
@@ -631,9 +589,13 @@ class _PressableButtonState extends State<_PressableButton>
   void initState() {
     super.initState();
     _ctrl = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 100));
-    _scale = Tween<double>(begin: 1.0, end: 0.96)
-        .animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeOut));
+      vsync: this,
+      duration: const Duration(milliseconds: 100),
+    );
+    _scale = Tween<double>(
+      begin: 1.0,
+      end: 0.96,
+    ).animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeOut));
   }
 
   @override

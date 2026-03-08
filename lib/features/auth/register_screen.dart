@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:lottie/lottie.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/services/api_service.dart';
 import '../../core/services/storage_service.dart';
@@ -27,24 +28,12 @@ class _RegisterScreenState extends State<RegisterScreen>
   bool _isLoading = false;
   int _passStrength = 0;
 
-  late AnimationController _headerCtrl;
-  late Animation<double> _headerY;
   late AnimationController _formCtrl;
 
   @override
   void initState() {
     super.initState();
 
-    // Header floating decor
-    _headerCtrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 3200),
-    )..repeat(reverse: true);
-    _headerY = Tween<double>(begin: -8, end: 8).animate(
-      CurvedAnimation(parent: _headerCtrl, curve: Curves.easeInOut),
-    );
-
-    // Form entrance
     _formCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 600),
@@ -62,7 +51,6 @@ class _RegisterScreenState extends State<RegisterScreen>
 
   @override
   void dispose() {
-    _headerCtrl.dispose();
     _formCtrl.dispose();
     _namaCtrl.dispose();
     _emailCtrl.dispose();
@@ -106,27 +94,31 @@ class _RegisterScreenState extends State<RegisterScreen>
       }
       messenger.showSnackBar(
         SnackBar(
-          content: Text(msg,
-              style: GoogleFonts.plusJakartaSans(
-                  fontSize: 13, color: AppColors.white)),
+          content: Text(
+            msg,
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 13,
+              color: AppColors.white,
+            ),
+          ),
           backgroundColor: AppColors.danger,
           behavior: SnackBarBehavior.floating,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
         ),
       );
     }
   }
 
   Color get _strengthColor => [
-        AppColors.divider,
-        AppColors.danger,
-        AppColors.warning,
-        AppColors.success
-      ][_passStrength];
+    AppColors.divider,
+    AppColors.danger,
+    AppColors.warning,
+    AppColors.success,
+  ][_passStrength];
 
-  String get _strengthLabel =>
-      ['', 'Lemah', 'Sedang', 'Kuat'][_passStrength];
+  String get _strengthLabel => ['', 'Lemah', 'Sedang', 'Kuat'][_passStrength];
 
   @override
   Widget build(BuildContext context) {
@@ -135,101 +127,46 @@ class _RegisterScreenState extends State<RegisterScreen>
       resizeToAvoidBottomInset: true,
       body: Column(
         children: [
-          // ── Header ──
-          Flexible(
-            flex: 0,
+          // ── Header dengan Lottie ──
+          Expanded(
+            flex: 46,
             child: SafeArea(
               bottom: false,
-              child: Stack(
+              child: Column(
                 children: [
-                  // Decor circles
-                  AnimatedBuilder(
-                    animation: _headerY,
-                    builder: (_, __) => Positioned(
-                      top: _headerY.value,
-                      right: -20,
-                      child: Container(
-                        width: 100,
-                        height: 100,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Colors.white.withValues(alpha: 0.06),
-                        ),
-                      ),
-                    ),
-                  ),
-                  AnimatedBuilder(
-                    animation: _headerY,
-                    builder: (_, __) => Positioned(
-                      bottom: -_headerY.value * 0.5,
-                      left: -10,
-                      child: Container(
-                        width: 70,
-                        height: 70,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: AppColors.gold.withValues(alpha: 0.12),
-                        ),
-                      ),
-                    ),
-                  ),
-
+                  // Top bar
                   Padding(
-                    padding:
-                        const EdgeInsets.fromLTRB(20, 14, 20, 28),
+                    padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Row(
-                          children: [
-                            Container(
-                              width: 44,
-                              height: 44,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: AppColors.white,
-                                boxShadow: [
-                                  BoxShadow(
-                                    color:
-                                        Colors.black.withValues(alpha: 0.15),
-                                    blurRadius: 10,
-                                    offset: const Offset(0, 4),
-                                  ),
-                                ],
+                        GestureDetector(
+                          onTap: () => Navigator.pop(context),
+                          child: Container(
+                            width: 38,
+                            height: 38,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: Colors.white.withValues(alpha: 0.1),
+                              border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.2),
                               ),
-                              child: const Icon(Icons.school_rounded,
-                                  color: AppColors.primary, size: 22),
                             ),
-                            const SizedBox(width: 12),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Buat Akun Baru',
-                                  style: GoogleFonts.plusJakartaSans(
-                                    fontSize: 17,
-                                    fontWeight: FontWeight.bold,
-                                    color: AppColors.white,
-                                  ),
-                                ),
-                                Text(
-                                  'SD Negeri Warialau',
-                                  style: GoogleFonts.plusJakartaSans(
-                                    fontSize: 12,
-                                    color: AppColors.gold,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
+                            child: const Icon(
+                              Icons.chevron_left_rounded,
+                              color: Colors.white,
+                              size: 22,
                             ),
-                          ],
+                          ),
                         ),
                         GestureDetector(
-                          onTap: () => Navigator.pushReplacementNamed(
-                              context, '/login'),
+                          onTap: () =>
+                              Navigator.pushReplacementNamed(context, '/login'),
                           child: Container(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 14, vertical: 7),
+                              horizontal: 14,
+                              vertical: 7,
+                            ),
                             decoration: BoxDecoration(
                               color: AppColors.gold.withValues(alpha: 0.18),
                               borderRadius: BorderRadius.circular(999),
@@ -250,6 +187,52 @@ class _RegisterScreenState extends State<RegisterScreen>
                       ],
                     ),
                   ),
+
+                  // Lottie animation
+                  Expanded(
+                    child: Lottie.asset(
+                      'lib/animations/register.json',
+                      fit: BoxFit.contain,
+                      animate: true,
+                      repeat: true,
+                      errorBuilder: (_, __, ___) => const Icon(
+                        Icons.person_add_rounded,
+                        size: 100,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+
+                  // Title chip
+                  Text(
+                    'Buat Akun Baru',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.gold.withValues(alpha: 0.18),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      'SD NEGERI WARIALAU',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.gold,
+                        letterSpacing: 1.8,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
                 ],
               ),
             ),
@@ -257,16 +240,22 @@ class _RegisterScreenState extends State<RegisterScreen>
 
           // ── Form card ──
           Expanded(
+            flex: 54,
             child: AnimatedBuilder(
               animation: _formCtrl,
               builder: (_, child) => FadeTransition(
                 opacity: _formCtrl,
                 child: SlideTransition(
-                  position: Tween<Offset>(
-                    begin: const Offset(0, 0.08),
-                    end: Offset.zero,
-                  ).animate(CurvedAnimation(
-                      parent: _formCtrl, curve: Curves.easeOut)),
+                  position:
+                      Tween<Offset>(
+                        begin: const Offset(0, 0.08),
+                        end: Offset.zero,
+                      ).animate(
+                        CurvedAnimation(
+                          parent: _formCtrl,
+                          curve: Curves.easeOut,
+                        ),
+                      ),
                   child: child,
                 ),
               ),
@@ -274,8 +263,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                 width: double.infinity,
                 decoration: const BoxDecoration(
                   color: AppColors.white,
-                  borderRadius:
-                      BorderRadius.vertical(top: Radius.circular(28)),
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
                 ),
                 child: SingleChildScrollView(
                   padding: const EdgeInsets.fromLTRB(24, 28, 24, 32),
@@ -340,53 +328,75 @@ class _RegisterScreenState extends State<RegisterScreen>
                           controller: _phoneCtrl,
                           keyboardType: TextInputType.phone,
                           inputFormatters: [
-                            FilteringTextInputFormatter.digitsOnly
+                            FilteringTextInputFormatter.digitsOnly,
                           ],
                           style: _ts(),
                           decoration: InputDecoration(
                             hintText: '812xxxx',
-                            hintStyle:
-                                GoogleFonts.plusJakartaSans(color: AppColors.textLight, fontSize: 14),
+                            hintStyle: GoogleFonts.plusJakartaSans(
+                              color: AppColors.textLight,
+                              fontSize: 14,
+                            ),
                             prefixIcon: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 const SizedBox(width: 14),
-                                Text('+62',
-                                    style: GoogleFonts.plusJakartaSans(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w600,
-                                      color: AppColors.textSecondary,
-                                    )),
+                                Text(
+                                  '+62',
+                                  style: GoogleFonts.plusJakartaSans(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.textSecondary,
+                                  ),
+                                ),
                                 const SizedBox(width: 8),
                                 Container(
-                                    width: 1, height: 20, color: AppColors.divider),
+                                  width: 1,
+                                  height: 20,
+                                  color: AppColors.divider,
+                                ),
                                 const SizedBox(width: 8),
                               ],
                             ),
-                            prefixIconConstraints:
-                                const BoxConstraints(minWidth: 0, minHeight: 0),
+                            prefixIconConstraints: const BoxConstraints(
+                              minWidth: 0,
+                              minHeight: 0,
+                            ),
                             filled: true,
                             fillColor: AppColors.inputBg,
                             border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(14),
-                                borderSide: BorderSide.none),
+                              borderRadius: BorderRadius.circular(14),
+                              borderSide: BorderSide.none,
+                            ),
                             enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(14),
-                                borderSide: BorderSide.none),
+                              borderRadius: BorderRadius.circular(14),
+                              borderSide: BorderSide.none,
+                            ),
                             focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(14),
-                                borderSide: const BorderSide(
-                                    color: AppColors.primary, width: 1.5)),
+                              borderRadius: BorderRadius.circular(14),
+                              borderSide: const BorderSide(
+                                color: AppColors.primary,
+                                width: 1.5,
+                              ),
+                            ),
                             errorBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(14),
-                                borderSide: const BorderSide(
-                                    color: AppColors.danger, width: 1.5)),
+                              borderRadius: BorderRadius.circular(14),
+                              borderSide: const BorderSide(
+                                color: AppColors.danger,
+                                width: 1.5,
+                              ),
+                            ),
                             focusedErrorBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(14),
-                                borderSide: const BorderSide(
-                                    color: AppColors.danger, width: 1.5)),
+                              borderRadius: BorderRadius.circular(14),
+                              borderSide: const BorderSide(
+                                color: AppColors.danger,
+                                width: 1.5,
+                              ),
+                            ),
                             contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 16),
+                              horizontal: 16,
+                              vertical: 16,
+                            ),
                           ),
                           validator: (v) => (v == null || v.isEmpty)
                               ? 'Nomor HP tidak boleh kosong'
@@ -482,7 +492,8 @@ class _RegisterScreenState extends State<RegisterScreen>
                                 size: 20,
                               ),
                               onPressed: () => setState(
-                                  () => _obscureConfirm = !_obscureConfirm),
+                                () => _obscureConfirm = !_obscureConfirm,
+                              ),
                             ),
                           ),
                           validator: (v) => v != _passCtrl.text
@@ -499,10 +510,9 @@ class _RegisterScreenState extends State<RegisterScreen>
                             width: double.infinity,
                             height: 52,
                             decoration: BoxDecoration(
-                              gradient: const LinearGradient(colors: [
-                                AppColors.gold,
-                                Color(0xFFE8C53A),
-                              ]),
+                              gradient: const LinearGradient(
+                                colors: [AppColors.gold, Color(0xFFE8C53A)],
+                              ),
                               borderRadius: BorderRadius.circular(999),
                               boxShadow: [
                                 BoxShadow(
@@ -539,16 +549,18 @@ class _RegisterScreenState extends State<RegisterScreen>
                         Center(
                           child: GestureDetector(
                             onTap: () => Navigator.pushReplacementNamed(
-                                context, '/login'),
+                              context,
+                              '/login',
+                            ),
                             child: RichText(
                               text: TextSpan(
                                 style: GoogleFonts.plusJakartaSans(
                                   fontSize: 14,
                                   color: AppColors.textSecondary,
                                 ),
-                                children: [
-                                  const TextSpan(text: 'Sudah punya akun? '),
-                                  const TextSpan(
+                                children: const [
+                                  TextSpan(text: 'Sudah punya akun? '),
+                                  TextSpan(
                                     text: 'Masuk',
                                     style: TextStyle(
                                       color: AppColors.gold,
@@ -585,17 +597,17 @@ class _RegisterScreenState extends State<RegisterScreen>
     );
   }
 
-  TextStyle _ts() => GoogleFonts.plusJakartaSans(
-      fontSize: 14, color: AppColors.textPrimary);
+  TextStyle _ts() =>
+      GoogleFonts.plusJakartaSans(fontSize: 14, color: AppColors.textPrimary);
 
   Widget _label(String t) => Text(
-        t,
-        style: GoogleFonts.plusJakartaSans(
-          fontSize: 13,
-          fontWeight: FontWeight.w600,
-          color: AppColors.textPrimary,
-        ),
-      );
+    t,
+    style: GoogleFonts.plusJakartaSans(
+      fontSize: 13,
+      fontWeight: FontWeight.w600,
+      color: AppColors.textPrimary,
+    ),
+  );
 
   Widget _field({
     required TextEditingController ctrl,
@@ -620,29 +632,34 @@ class _RegisterScreenState extends State<RegisterScreen>
   }) {
     return InputDecoration(
       hintText: hint,
-      hintStyle:
-          GoogleFonts.plusJakartaSans(color: AppColors.textLight, fontSize: 14),
+      hintStyle: GoogleFonts.plusJakartaSans(
+        color: AppColors.textLight,
+        fontSize: 14,
+      ),
       prefixIcon: Icon(icon, color: AppColors.textLight, size: 20),
       filled: true,
       fillColor: AppColors.inputBg,
       border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+        borderRadius: BorderRadius.circular(14),
+        borderSide: BorderSide.none,
+      ),
       enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+        borderRadius: BorderRadius.circular(14),
+        borderSide: BorderSide.none,
+      ),
       focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide:
-              const BorderSide(color: AppColors.primary, width: 1.5)),
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+      ),
       errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide:
-              const BorderSide(color: AppColors.danger, width: 1.5)),
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: AppColors.danger, width: 1.5),
+      ),
       focusedErrorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide:
-              const BorderSide(color: AppColors.danger, width: 1.5)),
-      contentPadding:
-          const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: AppColors.danger, width: 1.5),
+      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       suffixIcon: suffix,
     );
   }
@@ -666,9 +683,13 @@ class _PressableBtnState extends State<_PressableBtn>
   void initState() {
     super.initState();
     _c = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 100));
-    _s = Tween<double>(begin: 1.0, end: 0.96)
-        .animate(CurvedAnimation(parent: _c, curve: Curves.easeOut));
+      vsync: this,
+      duration: const Duration(milliseconds: 100),
+    );
+    _s = Tween<double>(
+      begin: 1.0,
+      end: 0.96,
+    ).animate(CurvedAnimation(parent: _c, curve: Curves.easeOut));
   }
 
   @override
