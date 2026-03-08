@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'core/constants/app_colors.dart';
+import 'core/utils/app_transitions.dart';
 import 'features/splash/splash_screen.dart';
 import 'features/onboarding/onboarding_screen.dart';
 import 'features/auth/login_screen.dart';
 import 'features/auth/register_screen.dart';
 import 'features/auth/forgot_password_screen.dart';
 import 'features/auth/otp_screen.dart';
+import 'features/main_navigation/main_navigation.dart';
 
 void main() {
   runApp(const MyApp());
@@ -26,16 +28,29 @@ class MyApp extends StatelessWidget {
         useMaterial3: true,
       ),
       initialRoute: '/',
-      routes: {
-        '/': (context) => const SplashScreen(),
-        '/onboarding': (context) => const OnboardingScreen(),
-        '/login': (context) => const LoginScreen(),
-        '/register': (context) => const RegisterScreen(),
-        '/forgot-password': (context) => const ForgotPasswordScreen(),
-        '/otp': (context) => const OtpScreen(),
-        '/home': (context) => const Scaffold(
-              body: Center(child: Text('Home — Coming Soon')),
-            ),
+      onGenerateRoute: (settings) {
+        Widget page;
+        switch (settings.name) {
+          case '/onboarding':
+            page = const OnboardingScreen();
+          case '/login':
+            page = const LoginScreen();
+          case '/register':
+            page = const RegisterScreen();
+          case '/forgot-password':
+            page = const ForgotPasswordScreen();
+          case '/otp':
+            page = const OtpScreen();
+          case '/home':
+            page = const MainNavigation();
+          default:
+            page = const SplashScreen();
+        }
+        // Splash uses no transition (initial route)
+        if (settings.name == '/') {
+          return MaterialPageRoute(builder: (_) => page, settings: settings);
+        }
+        return AppRoute(page: page, settings: settings);
       },
     );
   }

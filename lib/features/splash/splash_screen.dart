@@ -31,32 +31,38 @@ class _SplashScreenState extends State<SplashScreen>
       duration: const Duration(milliseconds: 800),
     );
 
-    _logoScale = TweenSequence<double>([
-      TweenSequenceItem(tween: Tween(begin: 0.0, end: 1.12), weight: 65),
-      TweenSequenceItem(tween: Tween(begin: 1.12, end: 1.0), weight: 35),
-    ]).animate(
-      CurvedAnimation(
-          parent: _introController,
-          curve: const Interval(0.0, 0.75, curve: Curves.easeOut)),
-    );
+    _logoScale =
+        TweenSequence<double>([
+          TweenSequenceItem(tween: Tween(begin: 0.0, end: 1.12), weight: 65),
+          TweenSequenceItem(tween: Tween(begin: 1.12, end: 1.0), weight: 35),
+        ]).animate(
+          CurvedAnimation(
+            parent: _introController,
+            curve: const Interval(0.0, 0.75, curve: Curves.easeOut),
+          ),
+        );
 
     _logoFade = Tween<double>(begin: 0, end: 1).animate(
       CurvedAnimation(
-          parent: _introController, curve: const Interval(0.0, 0.4)),
+        parent: _introController,
+        curve: const Interval(0.0, 0.4),
+      ),
     );
 
     _textFade = Tween<double>(begin: 0, end: 1).animate(
       CurvedAnimation(
-          parent: _introController, curve: const Interval(0.55, 1.0)),
+        parent: _introController,
+        curve: const Interval(0.55, 1.0),
+      ),
     );
 
-    _textSlide = Tween<Offset>(
-      begin: const Offset(0, 0.4),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: _introController,
-      curve: const Interval(0.55, 1.0, curve: Curves.easeOut),
-    ));
+    _textSlide = Tween<Offset>(begin: const Offset(0, 0.4), end: Offset.zero)
+        .animate(
+          CurvedAnimation(
+            parent: _introController,
+            curve: const Interval(0.55, 1.0, curve: Curves.easeOut),
+          ),
+        );
 
     // ── Pulse rings (repeat) ──
     _pulseController = AnimationController(
@@ -71,7 +77,9 @@ class _SplashScreenState extends State<SplashScreen>
     );
 
     _progress = CurvedAnimation(
-        parent: _progressController, curve: Curves.easeInOut);
+      parent: _progressController,
+      curve: Curves.easeInOut,
+    );
 
     // ── Sequence ──
     _introController.forward().then((_) {
@@ -114,10 +122,7 @@ class _SplashScreenState extends State<SplashScreen>
               height: size,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                border: Border.all(
-                  color: AppColors.gold,
-                  width: 1.5,
-                ),
+                border: Border.all(color: AppColors.gold, width: 1.5),
               ),
             ),
           ),
@@ -258,7 +263,9 @@ class _SplashScreenState extends State<SplashScreen>
                         const SizedBox(height: 8),
                         Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 14, vertical: 5),
+                            horizontal: 14,
+                            vertical: 5,
+                          ),
                           decoration: BoxDecoration(
                             color: AppColors.gold.withValues(alpha: 0.15),
                             borderRadius: BorderRadius.circular(999),
@@ -312,7 +319,8 @@ class _SplashScreenState extends State<SplashScreen>
                             strokeWidth: 3,
                             strokeCap: StrokeCap.round,
                             valueColor: const AlwaysStoppedAnimation<Color>(
-                                AppColors.gold),
+                              AppColors.gold,
+                            ),
                           ),
                           Text(
                             '$pct%',
@@ -359,10 +367,9 @@ class _SplashScreenState extends State<SplashScreen>
                           widthFactor: _progress.value,
                           child: Container(
                             decoration: BoxDecoration(
-                              gradient: const LinearGradient(colors: [
-                                AppColors.gold,
-                                Color(0xFFF5D060),
-                              ]),
+                              gradient: const LinearGradient(
+                                colors: [AppColors.gold, Color(0xFFF5D060)],
+                              ),
                               borderRadius: BorderRadius.circular(999),
                               boxShadow: [
                                 BoxShadow(
@@ -394,7 +401,11 @@ class _DiagonalPainter extends CustomPainter {
       ..strokeWidth = 1.2;
     const gap = 22.0;
     for (double x = -size.height; x < size.width + size.height; x += gap) {
-      canvas.drawLine(Offset(x, 0), Offset(x + size.height, size.height), paint);
+      canvas.drawLine(
+        Offset(x, 0),
+        Offset(x + size.height, size.height),
+        paint,
+      );
     }
   }
 
