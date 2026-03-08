@@ -4,6 +4,7 @@ import '../../core/constants/app_colors.dart';
 import '../home/home_screen.dart';
 import '../berita/berita_screen.dart';
 import '../galeri/galeri_screen.dart';
+import '../pendaftaran/pendaftaran_screen.dart';
 import '../profil_sekolah/profil_sekolah_screen.dart';
 
 class MainNavigation extends StatefulWidget {
@@ -33,6 +34,11 @@ class _MainNavigationState extends State<MainNavigation>
       label: 'Galeri',
       icon: Icons.photo_library_outlined,
       activeIcon: Icons.photo_library_rounded,
+    ),
+    _TabItem(
+      label: 'Daftar',
+      icon: Icons.assignment_outlined,
+      activeIcon: Icons.assignment_rounded,
     ),
     _TabItem(
       label: 'Profil',
@@ -78,6 +84,7 @@ class _MainNavigationState extends State<MainNavigation>
           _KeepAlivePage(child: HomeScreen()),
           _KeepAlivePage(child: BeritaScreen()),
           _KeepAlivePage(child: GaleriScreen()),
+          _KeepAlivePage(child: PendaftaranScreen()),
           _KeepAlivePage(child: ProfilSekolahScreen()),
         ],
       ),

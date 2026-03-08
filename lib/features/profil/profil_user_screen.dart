@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/models/user_model.dart';
+import '../../core/services/api_service.dart';
+import '../../core/services/storage_service.dart';
 
 class ProfilUserScreen extends StatefulWidget {
   const ProfilUserScreen({super.key});
@@ -11,23 +13,21 @@ class ProfilUserScreen extends StatefulWidget {
 }
 
 class _ProfilUserScreenState extends State<ProfilUserScreen>
-    with TickerProviderStateMixin {
+    with SingleTickerProviderStateMixin {
   bool _isEditing = false;
   bool _isSaving = false;
   bool _obscureOld = true;
   bool _obscureNew = true;
   bool _obscureConfirm = true;
   bool _showPasswordSection = false;
+  bool _isLoading = true;
 
-  late UserModel _user;
+  UserModel? _user;
 
   // Controllers
   late TextEditingController _nameCtrl;
   late TextEditingController _emailCtrl;
   late TextEditingController _phoneCtrl;
-  late TextEditingController _addressCtrl;
-  late TextEditingController _studentNameCtrl;
-  late TextEditingController _studentClassCtrl;
   late TextEditingController _oldPassCtrl;
   late TextEditingController _newPassCtrl;
   late TextEditingController _confirmPassCtrl;
@@ -35,31 +35,24 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
   // Animation
   late AnimationController _editAnimCtrl;
 
-  String _selectedRole = 'Orang Tua Murid';
-  static const _roleOptions = ['Orang Tua Murid', 'Wali Murid', 'Kerabat'];
-
   final _formKey = GlobalKey<FormState>();
 
   @override
   void initState() {
     super.initState();
-    _user = currentUser;
-
-    _nameCtrl = TextEditingController(text: _user.name);
-    _emailCtrl = TextEditingController(text: _user.email);
-    _phoneCtrl = TextEditingController(text: _user.phone);
-    _addressCtrl = TextEditingController(text: _user.address);
-    _studentNameCtrl = TextEditingController(text: _user.studentName);
-    _studentClassCtrl = TextEditingController(text: _user.studentClass);
+    _nameCtrl = TextEditingController();
+    _emailCtrl = TextEditingController();
+    _phoneCtrl = TextEditingController();
     _oldPassCtrl = TextEditingController();
     _newPassCtrl = TextEditingController();
     _confirmPassCtrl = TextEditingController();
-    _selectedRole = _user.role;
 
     _editAnimCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 350),
     );
+
+    _fetchProfile();
   }
 
   @override
@@ -67,14 +60,29 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
     _nameCtrl.dispose();
     _emailCtrl.dispose();
     _phoneCtrl.dispose();
-    _addressCtrl.dispose();
-    _studentNameCtrl.dispose();
-    _studentClassCtrl.dispose();
     _oldPassCtrl.dispose();
     _newPassCtrl.dispose();
     _confirmPassCtrl.dispose();
     _editAnimCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _fetchProfile() async {
+    try {
+      final r = await ApiService.instance.get('/profile');
+      if (!mounted) return;
+      final u = UserModel.fromJson(r.data as Map<String, dynamic>);
+      setState(() {
+        _user = u;
+        _nameCtrl.text = u.name;
+        _emailCtrl.text = u.email;
+        _phoneCtrl.text = u.noHp;
+        _isLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+    }
   }
 
   void _toggleEdit() {
@@ -83,14 +91,11 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
       _editAnimCtrl.forward();
     } else {
       _editAnimCtrl.reverse();
-      // Reset fields if cancelled
-      _nameCtrl.text = _user.name;
-      _emailCtrl.text = _user.email;
-      _phoneCtrl.text = _user.phone;
-      _addressCtrl.text = _user.address;
-      _studentNameCtrl.text = _user.studentName;
-      _studentClassCtrl.text = _user.studentClass;
-      _selectedRole = _user.role;
+      if (_user != null) {
+        _nameCtrl.text = _user!.name;
+        _emailCtrl.text = _user!.email;
+        _phoneCtrl.text = _user!.noHp;
+      }
       _showPasswordSection = false;
     }
   }
@@ -98,62 +103,81 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isSaving = true);
-    await Future.delayed(const Duration(milliseconds: 1200));
-    if (!mounted) return;
-
-    // Update global dummy user
-    currentUser = currentUser.copyWith(
-      name: _nameCtrl.text.trim(),
-      email: _emailCtrl.text.trim(),
-      phone: _phoneCtrl.text.trim(),
-      address: _addressCtrl.text.trim(),
-      studentName: _studentNameCtrl.text.trim(),
-      studentClass: _studentClassCtrl.text.trim(),
-      role: _selectedRole,
-    );
-
-    setState(() {
-      _user = currentUser;
-      _isSaving = false;
-      _isEditing = false;
-      _showPasswordSection = false;
-    });
-    _editAnimCtrl.reverse();
-
-    _showSnack('Profil berhasil diperbarui', AppColors.success);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final r = await ApiService.instance.patch('/profile/info', data: {
+        'name': _nameCtrl.text.trim(),
+        'email': _emailCtrl.text.trim(),
+        'no_hp': _phoneCtrl.text.trim(),
+      });
+      if (!mounted) return;
+      final updated = UserModel.fromJson(r.data['user'] as Map<String, dynamic>);
+      setState(() {
+        _user = updated;
+        _isSaving = false;
+        _isEditing = false;
+        _showPasswordSection = false;
+      });
+      _editAnimCtrl.reverse();
+      messenger.showSnackBar(_snackBar('Profil berhasil diperbarui', AppColors.success));
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isSaving = false);
+      messenger.showSnackBar(_snackBar('Gagal menyimpan profil', AppColors.danger));
+    }
   }
 
-  void _showSnack(String msg, Color color) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            Icon(
-              color == AppColors.success
-                  ? Icons.check_circle_rounded
-                  : Icons.error_rounded,
-              color: AppColors.white,
-              size: 18,
-            ),
-            const SizedBox(width: 10),
-            Text(
-              msg,
-              style: GoogleFonts.plusJakartaSans(
-                  fontSize: 13, fontWeight: FontWeight.w600),
-            ),
-          ],
-        ),
-        backgroundColor: color,
-        behavior: SnackBarBehavior.floating,
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        margin: const EdgeInsets.all(16),
+  SnackBar _snackBar(String msg, Color color) {
+    return SnackBar(
+      content: Row(
+        children: [
+          Icon(
+            color == AppColors.success
+                ? Icons.check_circle_rounded
+                : Icons.error_rounded,
+            color: AppColors.white,
+            size: 18,
+          ),
+          const SizedBox(width: 10),
+          Text(
+            msg,
+            style: GoogleFonts.plusJakartaSans(
+                fontSize: 13, fontWeight: FontWeight.w600),
+          ),
+        ],
       ),
+      backgroundColor: color,
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      margin: const EdgeInsets.all(16),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return Scaffold(
+        backgroundColor: AppColors.backgroundLight,
+        appBar: AppBar(
+          backgroundColor: AppColors.primary,
+          title: Text(
+            'Profil Saya',
+            style: GoogleFonts.plusJakartaSans(
+              fontWeight: FontWeight.bold,
+              color: AppColors.white,
+            ),
+          ),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_rounded, color: AppColors.white),
+            onPressed: () => Navigator.pop(context),
+          ),
+        ),
+        body: const Center(
+          child: CircularProgressIndicator(color: AppColors.gold),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: AppColors.backgroundLight,
       body: CustomScrollView(
@@ -168,8 +192,6 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
                   const SizedBox(height: 20),
                   _buildInfoSection(),
                   const SizedBox(height: 16),
-                  _buildStudentSection(),
-                  const SizedBox(height: 16),
                   _buildPasswordSection(),
                   const SizedBox(height: 16),
                   _buildDangerZone(),
@@ -180,10 +202,7 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
           ),
         ],
       ),
-      // Floating Save Button
-      bottomNavigationBar: _isEditing
-          ? _buildSaveBar()
-          : null,
+      bottomNavigationBar: _isEditing ? _buildSaveBar() : null,
     );
   }
 
@@ -247,6 +266,7 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
 
   // ── Profile Header ───────────────────────────────────────
   Widget _buildProfileHeader() {
+    final user = _user;
     return Container(
       width: double.infinity,
       decoration: const BoxDecoration(
@@ -276,67 +296,36 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
             child: Column(
               children: [
                 // Avatar
-                Stack(
-                  children: [
-                    Container(
-                      width: 96,
-                      height: 96,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: const LinearGradient(
-                          colors: [AppColors.gold, Color(0xFFE8C547)],
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppColors.gold.withValues(alpha: 0.4),
-                            blurRadius: 20,
-                            spreadRadius: 2,
-                          ),
-                        ],
+                Container(
+                  width: 96,
+                  height: 96,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: const LinearGradient(
+                      colors: [AppColors.gold, Color(0xFFE8C547)],
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.gold.withValues(alpha: 0.4),
+                        blurRadius: 20,
+                        spreadRadius: 2,
                       ),
-                      child: Center(
-                        child: Text(
-                          _user.initials,
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 32,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.primary,
-                          ),
-                        ),
+                    ],
+                  ),
+                  child: Center(
+                    child: Text(
+                      user?.initials ?? '?',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 32,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.primary,
                       ),
                     ),
-                    if (_isEditing)
-                      Positioned(
-                        bottom: 0,
-                        right: 0,
-                        child: GestureDetector(
-                          onTap: () {},
-                          child: Container(
-                            width: 30,
-                            height: 30,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: AppColors.white,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.2),
-                                  blurRadius: 8,
-                                ),
-                              ],
-                            ),
-                            child: const Icon(
-                              Icons.camera_alt_rounded,
-                              size: 16,
-                              color: AppColors.primary,
-                            ),
-                          ),
-                        ),
-                      ),
-                  ],
+                  ),
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  _user.name,
+                  user?.name ?? '',
                   style: GoogleFonts.plusJakartaSans(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
@@ -352,7 +341,7 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
                     borderRadius: BorderRadius.circular(999),
                   ),
                   child: Text(
-                    _user.role,
+                    user?.roleLabel ?? '',
                     style: GoogleFonts.plusJakartaSans(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
@@ -362,7 +351,7 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  _user.email,
+                  user?.email ?? '',
                   style: GoogleFonts.plusJakartaSans(
                     fontSize: 13,
                     color: Colors.white.withValues(alpha: 0.7),
@@ -409,76 +398,6 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
           enabled: _isEditing,
           keyboardType: TextInputType.phone,
         ),
-        _buildField(
-          label: 'Alamat',
-          icon: Icons.location_on_rounded,
-          controller: _addressCtrl,
-          enabled: _isEditing,
-          maxLines: 2,
-        ),
-        // Role dropdown
-        if (_isEditing) ...[
-          const SizedBox(height: 12),
-          _FieldLabel('Hubungan dengan Siswa'),
-          const SizedBox(height: 6),
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            decoration: BoxDecoration(
-              color: AppColors.inputBg,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(
-                color: AppColors.primary.withValues(alpha: 0.4),
-                width: 1.5,
-              ),
-            ),
-            child: DropdownButtonFormField<String>(
-              initialValue: _selectedRole,
-              decoration: const InputDecoration(
-                contentPadding:
-                    EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                border: InputBorder.none,
-                prefixIcon: Icon(Icons.family_restroom_rounded,
-                    color: AppColors.primary, size: 20),
-              ),
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 14,
-                color: AppColors.textPrimary,
-              ),
-              dropdownColor: AppColors.white,
-              items: _roleOptions
-                  .map((r) => DropdownMenuItem(value: r, child: Text(r)))
-                  .toList(),
-              onChanged: (v) => setState(() => _selectedRole = v!),
-            ),
-          ),
-        ] else
-          _buildReadField(
-            label: 'Hubungan dengan Siswa',
-            icon: Icons.family_restroom_rounded,
-            value: _user.role,
-          ),
-      ],
-    );
-  }
-
-  // ── Student Section ──────────────────────────────────────
-  Widget _buildStudentSection() {
-    return _SectionCard(
-      title: 'Data Siswa',
-      icon: Icons.school_rounded,
-      children: [
-        _buildField(
-          label: 'Nama Siswa',
-          icon: Icons.person_pin_rounded,
-          controller: _studentNameCtrl,
-          enabled: _isEditing,
-        ),
-        _buildField(
-          label: 'Kelas',
-          icon: Icons.class_rounded,
-          controller: _studentClassCtrl,
-          enabled: _isEditing,
-        ),
       ],
     );
   }
@@ -521,8 +440,9 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
                       style: GoogleFonts.plusJakartaSans(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
-                        color:
-                            _isEditing ? AppColors.primary : AppColors.textLight,
+                        color: _isEditing
+                            ? AppColors.primary
+                            : AppColors.textLight,
                       ),
                     ),
                   ),
@@ -587,48 +507,41 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
   Widget _buildDangerZone() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Column(
-        children: [
-          // Logout button
-          GestureDetector(
-            onTap: () => _showLogoutDialog(),
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              decoration: BoxDecoration(
-                color: AppColors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppColors.danger.withValues(alpha: 0.3)),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.04),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
+      child: GestureDetector(
+        onTap: () => _showLogoutDialog(),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          decoration: BoxDecoration(
+            color: AppColors.white,
+            borderRadius: BorderRadius.circular(16),
+            border:
+                Border.all(color: AppColors.danger.withValues(alpha: 0.3)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.04),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(
-                    Icons.logout_rounded,
-                    color: AppColors.danger,
-                    size: 20,
-                  ),
-                  const SizedBox(width: 10),
-                  Text(
-                    'Keluar dari Akun',
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.danger,
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            ],
           ),
-        ],
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.logout_rounded,
+                  color: AppColors.danger, size: 20),
+              const SizedBox(width: 10),
+              Text(
+                'Keluar dari Akun',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.danger,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -651,7 +564,6 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
       ),
       child: Row(
         children: [
-          // Cancel
           Expanded(
             child: GestureDetector(
               onTap: _isSaving ? null : _toggleEdit,
@@ -676,7 +588,6 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
             ),
           ),
           const SizedBox(width: 12),
-          // Save
           Expanded(
             flex: 2,
             child: GestureDetector(
@@ -736,7 +647,8 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text(
           'Keluar dari Akun?',
           style: GoogleFonts.plusJakartaSans(
@@ -757,12 +669,19 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
             child: Text(
               'Batal',
               style: GoogleFonts.plusJakartaSans(
-                  fontWeight: FontWeight.bold, color: AppColors.textSecondary),
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textSecondary),
             ),
           ),
           TextButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(context);
+              // Panggil endpoint logout + hapus token
+              try {
+                await ApiService.instance.post('/auth/logout');
+              } catch (_) {}
+              await StorageService.clearAll();
+              if (!mounted) return;
               Navigator.pushNamedAndRemoveUntil(
                   context, '/login', (_) => false);
             },
@@ -805,15 +724,6 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
                   : AppColors.divider,
               width: enabled ? 1.5 : 1,
             ),
-            boxShadow: enabled
-                ? [
-                    BoxShadow(
-                      color: AppColors.primary.withValues(alpha: 0.06),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    )
-                  ]
-                : [],
           ),
           child: TextFormField(
             controller: controller,
@@ -823,54 +733,16 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
             validator: validator,
             style: GoogleFonts.plusJakartaSans(
               fontSize: 14,
-              color: enabled ? AppColors.textPrimary : AppColors.textSecondary,
+              color: AppColors.textPrimary,
             ),
             decoration: InputDecoration(
-              prefixIcon: Icon(icon,
-                  size: 20,
-                  color:
-                      enabled ? AppColors.primary : AppColors.textLight),
-              border: InputBorder.none,
               contentPadding: const EdgeInsets.symmetric(
-                  vertical: 14, horizontal: 16),
+                  horizontal: 16, vertical: 14),
+              border: InputBorder.none,
+              prefixIcon:
+                  Icon(icon, color: AppColors.primary, size: 20),
+              disabledBorder: InputBorder.none,
             ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildReadField({
-    required String label,
-    required IconData icon,
-    required String value,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const SizedBox(height: 12),
-        _FieldLabel(label),
-        const SizedBox(height: 6),
-        Container(
-          padding:
-              const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
-          decoration: BoxDecoration(
-            color: AppColors.inputBg,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: AppColors.divider),
-          ),
-          child: Row(
-            children: [
-              Icon(icon, size: 20, color: AppColors.textLight),
-              const SizedBox(width: 12),
-              Text(
-                value,
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 14,
-                  color: AppColors.textSecondary,
-                ),
-              ),
-            ],
           ),
         ),
       ],
@@ -890,42 +762,39 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
         const SizedBox(height: 12),
         _FieldLabel(label),
         const SizedBox(height: 6),
-        TextFormField(
-          controller: controller,
-          obscureText: obscure,
-          validator: validator,
-          style: GoogleFonts.plusJakartaSans(
-              fontSize: 14, color: AppColors.textPrimary),
-          decoration: InputDecoration(
-            prefixIcon: const Icon(Icons.lock_outline_rounded,
-                size: 20, color: AppColors.primary),
-            suffixIcon: IconButton(
-              icon: Icon(
-                obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined,
-                size: 18,
-                color: AppColors.textLight,
+        AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          decoration: BoxDecoration(
+            color: AppColors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: AppColors.primary.withValues(alpha: 0.4),
+              width: 1.5,
+            ),
+          ),
+          child: TextFormField(
+            controller: controller,
+            obscureText: obscure,
+            validator: validator,
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 14,
+              color: AppColors.textPrimary,
+            ),
+            decoration: InputDecoration(
+              contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16, vertical: 14),
+              border: InputBorder.none,
+              prefixIcon: const Icon(Icons.lock_rounded,
+                  color: AppColors.primary, size: 20),
+              suffixIcon: IconButton(
+                icon: Icon(
+                  obscure ? Icons.visibility_off : Icons.visibility,
+                  color: AppColors.textLight,
+                  size: 20,
+                ),
+                onPressed: onToggle,
               ),
-              onPressed: onToggle,
             ),
-            filled: true,
-            fillColor: AppColors.white,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide:
-                  BorderSide(color: AppColors.primary.withValues(alpha: 0.4), width: 1.5),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide:
-                  BorderSide(color: AppColors.primary.withValues(alpha: 0.4), width: 1.5),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide:
-                  const BorderSide(color: AppColors.primary, width: 1.5),
-            ),
-            contentPadding:
-                const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
           ),
         ),
       ],
@@ -933,7 +802,7 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
   }
 }
 
-// ── Section Card ──────────────────────────────────────────────────────────────
+// ── Section Card ─────────────────────────────────────────────────────────────
 
 class _SectionCard extends StatelessWidget {
   final String title;
@@ -951,14 +820,14 @@ class _SectionCard extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Container(
-        padding: const EdgeInsets.all(18),
+        padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
           color: AppColors.white,
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.06),
-              blurRadius: 14,
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 12,
               offset: const Offset(0, 4),
             ),
           ],
@@ -969,15 +838,15 @@ class _SectionCard extends StatelessWidget {
             Row(
               children: [
                 Container(
-                  width: 34,
-                  height: 34,
+                  width: 36,
+                  height: 36,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: AppColors.primary.withValues(alpha: 0.08),
                   ),
-                  child: Icon(icon, size: 18, color: AppColors.primary),
+                  child: Icon(icon, color: AppColors.primary, size: 18),
                 ),
-                const SizedBox(width: 10),
+                const SizedBox(width: 12),
                 Text(
                   title,
                   style: GoogleFonts.plusJakartaSans(
@@ -995,6 +864,8 @@ class _SectionCard extends StatelessWidget {
     );
   }
 }
+
+// ── Field Label ───────────────────────────────────────────────────────────────
 
 class _FieldLabel extends StatelessWidget {
   final String text;

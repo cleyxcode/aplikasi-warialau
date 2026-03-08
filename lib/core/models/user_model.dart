@@ -1,21 +1,27 @@
 class UserModel {
+  final int id;
   final String name;
   final String email;
-  final String phone;
+  final String noHp;
   final String role;
-  final String address;
-  final String studentName;
-  final String studentClass;
 
   const UserModel({
+    required this.id,
     required this.name,
     required this.email,
-    required this.phone,
+    required this.noHp,
     required this.role,
-    required this.address,
-    required this.studentName,
-    required this.studentClass,
   });
+
+  factory UserModel.fromJson(Map<String, dynamic> json) {
+    return UserModel(
+      id: json['id'] as int? ?? 0,
+      name: json['name'] as String? ?? '',
+      email: json['email'] as String? ?? '',
+      noHp: json['no_hp'] as String? ?? '',
+      role: json['role'] as String? ?? '',
+    );
+  }
 
   String get initials {
     final parts = name.trim().split(' ');
@@ -25,34 +31,30 @@ class UserModel {
     return name.isNotEmpty ? name[0].toUpperCase() : '?';
   }
 
+  String get roleLabel {
+    switch (role) {
+      case 'orangtua':
+        return 'Orang Tua Murid';
+      case 'admin':
+        return 'Admin';
+      default:
+        return 'Pengguna';
+    }
+  }
+
   UserModel copyWith({
+    int? id,
     String? name,
     String? email,
-    String? phone,
+    String? noHp,
     String? role,
-    String? address,
-    String? studentName,
-    String? studentClass,
   }) {
     return UserModel(
+      id: id ?? this.id,
       name: name ?? this.name,
       email: email ?? this.email,
-      phone: phone ?? this.phone,
+      noHp: noHp ?? this.noHp,
       role: role ?? this.role,
-      address: address ?? this.address,
-      studentName: studentName ?? this.studentName,
-      studentClass: studentClass ?? this.studentClass,
     );
   }
 }
-
-// Dummy user — nanti diganti dengan data dari API/auth
-UserModel currentUser = const UserModel(
-  name: 'Budi Santoso',
-  email: 'budi.santoso@gmail.com',
-  phone: '081234567890',
-  role: 'Orang Tua Murid',
-  address: 'Jl. Melati No. 12, Warialau, Maluku',
-  studentName: 'Andi Santoso',
-  studentClass: 'Kelas IV A',
-);

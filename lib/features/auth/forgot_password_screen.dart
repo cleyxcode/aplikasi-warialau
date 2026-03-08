@@ -1,6 +1,8 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/services/api_service.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key});
@@ -77,10 +79,33 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
   Future<void> _send() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isLoading = true);
-    await Future.delayed(const Duration(seconds: 2));
-    if (!mounted) return;
-    setState(() => _isLoading = false);
-    Navigator.pushNamed(context, '/otp', arguments: _emailCtrl.text.trim());
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+    try {
+      await ApiService.instance.post(
+        '/auth/forgot-password',
+        data: {'email': _emailCtrl.text.trim()},
+      );
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      navigator.pushNamed('/otp', arguments: _emailCtrl.text.trim());
+    } on DioException catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      final msg = e.response?.data['message'] as String? ??
+          'Gagal mengirim OTP. Periksa koneksi Anda.';
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(msg,
+              style: GoogleFonts.plusJakartaSans(
+                  fontSize: 13, color: AppColors.white)),
+          backgroundColor: AppColors.danger,
+          behavior: SnackBarBehavior.floating,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      );
+    }
   }
 
   @override

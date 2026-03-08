@@ -1,6 +1,10 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:lottie/lottie.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/services/api_service.dart';
+import '../../core/services/storage_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -16,6 +20,7 @@ class _LoginScreenState extends State<LoginScreen>
   final _passCtrl = TextEditingController();
   bool _obscure = true;
   bool _isLoading = false;
+  bool _showRocket = false;
 
   // Header decoration animation (floating circle)
   late AnimationController _decoreCtrl;
@@ -97,14 +102,79 @@ class _LoginScreenState extends State<LoginScreen>
   Future<void> _handleLogin() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isLoading = true);
-    await Future.delayed(const Duration(seconds: 2));
-    if (!mounted) return;
-    setState(() => _isLoading = false);
-    Navigator.pushReplacementNamed(context, '/home');
+    try {
+      final response = await ApiService.instance.post(
+        '/auth/login',
+        data: {
+          'email': _emailCtrl.text.trim(),
+          'password': _passCtrl.text,
+        },
+      );
+      if (!mounted) return;
+      await StorageService.saveToken(response.data['token'] as String);
+      setState(() {
+        _isLoading = false;
+        _showRocket = true;
+      });
+      await Future.delayed(const Duration(milliseconds: 2800));
+      if (!mounted) return;
+      Navigator.pushReplacementNamed(context, '/home');
+    } on DioException catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      final msg = e.response?.data['message'] as String? ??
+          'Login gagal. Periksa koneksi Anda.';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(msg,
+              style: GoogleFonts.plusJakartaSans(
+                  fontSize: 13, color: AppColors.white)),
+          backgroundColor: AppColors.danger,
+          behavior: SnackBarBehavior.floating,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_showRocket) {
+      return Scaffold(
+        backgroundColor: const Color(0xFF0C1E36),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Lottie.asset(
+                'lib/animations/rocket.json',
+                width: 260,
+                height: 260,
+                repeat: false,
+              ),
+              const SizedBox(height: 20),
+              Text(
+                'Login Berhasil!',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Selamat datang di SD Negeri Warialau',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 14,
+                  color: Colors.white.withValues(alpha: 0.65),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
     return Scaffold(
       backgroundColor: AppColors.primary,
       resizeToAvoidBottomInset: true,

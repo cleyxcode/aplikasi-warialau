@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:lottie/lottie.dart';
 import '../../core/constants/app_colors.dart';
 
 class NotifikasiScreen extends StatefulWidget {
@@ -281,18 +282,11 @@ class _NotifikasiScreenState extends State<NotifikasiScreen>
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Container(
-            width: 88,
-            height: 88,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: AppColors.primary.withValues(alpha: 0.06),
-            ),
-            child: const Icon(
-              Icons.notifications_off_outlined,
-              size: 40,
-              color: AppColors.textLight,
-            ),
+          Lottie.asset(
+            'lib/animations/empty.json',
+            width: 160,
+            height: 160,
+            repeat: true,
           ),
           const SizedBox(height: 18),
           Text(

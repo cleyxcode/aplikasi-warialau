@@ -8,6 +8,7 @@ import 'features/auth/login_screen.dart';
 import 'features/auth/register_screen.dart';
 import 'features/auth/forgot_password_screen.dart';
 import 'features/auth/otp_screen.dart';
+import 'features/auth/reset_password_screen.dart';
 import 'features/main_navigation/main_navigation.dart';
 
 void main() {
@@ -41,6 +42,8 @@ class MyApp extends StatelessWidget {
             page = const ForgotPasswordScreen();
           case '/otp':
             page = const OtpScreen();
+          case '/reset-password':
+            page = const ResetPasswordScreen();
           case '/home':
             page = const MainNavigation();
           default:

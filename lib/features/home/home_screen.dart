@@ -3,7 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../core/constants/app_colors.dart';
-import '../../core/models/user_model.dart';
+import '../../core/constants/app_constants.dart';
+import '../../core/services/api_service.dart';
 import '../../core/utils/app_transitions.dart';
 import '../profil/profil_user_screen.dart';
 import '../notifikasi/notifikasi_screen.dart';
@@ -20,55 +21,22 @@ class _HomeScreenState extends State<HomeScreen> {
   int _bannerIndex = 0;
   Timer? _bannerTimer;
 
-  static const _bannerImages = [
-    'https://lh3.googleusercontent.com/aida-public/AB6AXuD4s9jRwytGJd4Qlg3MneBhw8SPKopZ6Hrc8n7R-utsyQtiReT6-wRxDWchWrrmCM6RkgTi34mEm_Oqrdsc6CZiqTiKWDHG9Xr26iIgQe4I752XE9EAmnpzvzxGbapVz0yXpzdtQwcBXjT6Eduo0BjlUZHc4kqe2hUzHBRUWLlsnU9oD-GZ2BQVPzVCtGomdNiJv_LBfpdWwZ0uFUE7-szpb3ULBi3nYNZXX533ZutBqK_ZUlCryt7dP41hjM-1tRZ0k-uKOeb_Q9Bx',
-    'https://lh3.googleusercontent.com/aida-public/AB6AXuBNYCK_1MClMGQNVHWHTfvL5OZO66bHGa5isIrkz-l0B0MdivNUnFGaX3O0jXkgV5-G9U2kREq6EqGMaczXjEChJhG6ezVqgjAp7OpExc4OzK02lp3bTx7e1vM6SmLYMTqV4POozTKTwm4Skd28_K5bNBwYEV3iqnazfl0PsvGWWSiHcOFUP9XkoWkxSwbWyNT_w70DdrFEZh_7H3lbWL_y-_FoxSvB-QaeDPknRVdetnK-A_PYw6xvtQEDxWFePpzx-gnNUgxLLofW',
-    'https://lh3.googleusercontent.com/aida-public/AB6AXuAcgkc8MwKN7DcvPJa786E8fSCri8J2DOkY_FykLVyIdB7D3jRSmPgHD4JRLXLbreYgDxSjfgzvHimdEtw0Wb5FKZcomjEMNsYAslnKRvdhiJORDUXPp4ZkafyUs2XP9BLZYmNka16JTW-yzSLeJhv8GQMfEPMUsC9wtfMqc_cynjfqLdHOa_ceeY39uvx3akLz1KWL5fEfl60Zo_qejHQ_QuYq9UBrCWmATxrOgr01wg1Fs6YjJTHRQLUwG4HIRHUAYzYFjPUjOl5t',
-  ];
+  // ── State dari API ──────────────────────────────────────────
+  String _userName = '';
+  String _userRole = 'Pengguna';
 
-  static const _beritaList = [
-    _BeritaItem(
-      imageUrl:
-          'https://lh3.googleusercontent.com/aida-public/AB6AXuC1PqS3cEil3kyVA-HPjotC6DHemccf6KUv_3IC8hTm06sOREHqn5qJGcdp0EpG6UjT8w2tso8oq1eRWn-5D5-0gg2VtfIxB8q_iv4M15FMTS5Z-X63hKS0VhqQLJcP5R1WhpxJU84eBC-cm3WDaPIKXlsKYSOKrn2j1iTRANVu7BRTBmMsjAd7gEcKXOwwnDJeRm8UgCgiPS71MrTaK7KDzDXtnueoCY362Mv1WcrrO6CTs-CFCdyVwiFTxdHcWC8hubVtO-kDew7S',
-      badge: 'PRESTASI',
-      title: 'Juara 1 Lomba Lukis Tingkat Provinsi: Bakat Siswa SD Warialau',
-      date: '12 Mei 2024',
-    ),
-    _BeritaItem(
-      imageUrl:
-          'https://lh3.googleusercontent.com/aida-public/AB6AXuA1XiMEZWTwUpS4csjpTeVGB9rqntmDqlD5V57F81smiZDYp7WQvVHw9Bn5e9SCwft3YJM1JDexsJZCj0IIR9j2BwmTQJrrJN_FIX83NRitNTHjisyM-6HoPTGdmlNui4D-8_wAGFKeqONqMdItRsLnp9lYY0AeBjUTqEazIff_-7ODQ1fG_QMhECoJZ0zGzXPhcIrJFHOY4sCTMSscS9Dzkbx73kg4eFp4cuN7dAOE9cMvgbpKfwOQ4UVSCq-i6ahqZVKekUZKaTfd',
-      badge: 'KEGIATAN',
-      title: 'Upacara Bendera Senin: Membangun Kedisiplinan Sejak Dini',
-      date: '10 Mei 2024',
-    ),
-    _BeritaItem(
-      imageUrl:
-          'https://lh3.googleusercontent.com/aida-public/AB6AXuCmNW_0X-Hak6pv78v7kKiu7WFaoNfkTd2MfZQHwZ8FW2EUcRQ1mqW7OPngZVFrMTeOSLMurh0Nn_j2O9wFRCSe8mytV2rsrHJ63CAS99LU26S_VN2NKuaXzpgjzcjbui6OdVay7x7lekreg7_yfsSYWIbl9Kcu2ekJqNZtu7NNGgaWxZyeFzunKkVlygb-t-lCRCHpKh6o9COFj2TdYuUQeXu5ZfXRrAERkl5QGM2xeYDlvNCg8uC51_fOBWgyY8tWu0WihPRY5x19',
-      badge: 'INFO',
-      title: 'Pameran Sains Tahunan: Kreativitas Siswa dalam Dunia Ilmu Pengetahuan',
-      date: '5 Mei 2024',
-    ),
-  ];
+  List<String> _bannerUrls = [];
+  List<_BeritaItem> _beritaItems = [];
+  List<String> _galeriUrls = [];
 
-  static const _galeriImages = [
-    'https://lh3.googleusercontent.com/aida-public/AB6AXuAcgkc8MwKN7DcvPJa786E8fSCri8J2DOkY_FykLVyIdB7D3jRSmPgHD4JRLXLbreYgDxSjfgzvHimdEtw0Wb5FKZcomjEMNsYAslnKRvdhiJORDUXPp4ZkafyUs2XP9BLZYmNka16JTW-yzSLeJhv8GQMfEPMUsC9wtfMqc_cynjfqLdHOa_ceeY39uvx3akLz1KWL5fEfl60Zo_qejHQ_QuYq9UBrCWmATxrOgr01wg1Fs6YjJTHRQLUwG4HIRHUAYzYFjPUjOl5t',
-    'https://lh3.googleusercontent.com/aida-public/AB6AXuDgoK4EdgBus2PNJsihLy1X4jN3tt9_s08w9XmAVV82WsmMqdq578PGsSOVFPx1eWB2VxIozDIEvYZVKRm0oejQvPQtJ5YAgcpN5vB4968il6Uej1N0SJBUJytCOV3TX6K3lGgXW2tv9NY7KxM3G7Sn_LTA9curgf48sc8eKoXnkpR36ioNSv2eI0fkYvlazzYkQwZYXCMLuvn2i8qziOaA3twdg1eAEauDfwypF7TX6aLxvQ8_h7utI5cvWRTiVq9mP8uHO3ggNKvV',
-    'https://lh3.googleusercontent.com/aida-public/AB6AXuCmNW_0X-Hak6pv78v7kKiu7WFaoNfkTd2MfZQHwZ8FW2EUcRQ1mqW7OPngZVFrMTeOSLMurh0Nn_j2O9wFRCSe8mytV2rsrHJ63CAS99LU26S_VN2NKuaXzpgjzcjbui6OdVay7x7lekreg7_yfsSYWIbl9Kcu2ekJqNZtu7NNGgaWxZyeFzunKkVlygb-t-lCRCHpKh6o9COFj2TdYuUQeXu5ZfXRrAERkl5QGM2xeYDlvNCg8uC51_fOBWgyY8tWu0WihPRY5x19',
-    'https://lh3.googleusercontent.com/aida-public/AB6AXuDWrefFolJ7Re2Ho2OXNlb-dtqNn9k0-mLTxDkNw2bHs4niaNKK8ZNHp6k4jQQWfO9N9Yi8YpPOyRgn-djqoK0LmeGu06vO7S59RYd30e9niOFcSV1vQolPgnJha2L-uwEUmUvH50Zo7KK3VmuCNmKsuBYn_BqTDNxIfbPqik2A1W5QkJu11MqltKlN81sPm6O3hSQZP1_7edAMkSQRwgChAndlHcROYHKJB4BT_wbLnnTswvDzEsCL74dXK3DIVf8_FKZ9uHRdl8JH',
-  ];
+  String _tahunAjaran = '';
+  bool _pendaftaranAktif = false;
+  bool _isLoadingData = true;
 
   @override
   void initState() {
     super.initState();
-    _bannerTimer = Timer.periodic(const Duration(seconds: 4), (_) {
-      if (!mounted || !_bannerCtrl.hasClients) return;
-      final next = (_bannerIndex + 1) % _bannerImages.length;
-      _bannerCtrl.animateToPage(
-        next,
-        duration: const Duration(milliseconds: 500),
-        curve: Curves.easeInOut,
-      );
-    });
+    _loadData();
   }
 
   @override
@@ -77,6 +45,133 @@ class _HomeScreenState extends State<HomeScreen> {
     _bannerCtrl.dispose();
     super.dispose();
   }
+
+  // ── Data fetching ───────────────────────────────────────────
+
+  Future<void> _loadData() async {
+    await Future.wait([
+      _fetchProfile(),
+      _fetchBanners(),
+      _fetchBerita(),
+      _fetchGaleri(),
+      _fetchInfoPendaftaran(),
+    ]);
+    if (!mounted) return;
+    setState(() => _isLoadingData = false);
+    if (_bannerUrls.isNotEmpty) _startBannerTimer();
+  }
+
+  Future<void> _fetchProfile() async {
+    try {
+      final r = await ApiService.instance.get('/profile');
+      _userName = r.data['name'] as String? ?? '';
+      _userRole = _mapRole(r.data['role'] as String? ?? '');
+    } catch (_) {}
+  }
+
+  Future<void> _fetchBanners() async {
+    try {
+      final r = await ApiService.instance.get('/banner');
+      final list = (r.data as List<dynamic>?) ?? [];
+      _bannerUrls = list
+          .where((b) => b['status'] == 'aktif')
+          .map((b) => AppConstants.imageUrl(b['gambar'] as String?))
+          .where((url) => url.isNotEmpty)
+          .toList();
+    } catch (_) {}
+  }
+
+  Future<void> _fetchBerita() async {
+    try {
+      final r = await ApiService.instance
+          .get('/berita', queryParameters: {'per_page': 5, 'page': 1});
+      final list = (r.data['data'] as List<dynamic>?) ?? [];
+      _beritaItems = list.map((b) {
+        final kategori = (b['kategori'] as String? ?? 'Info').toUpperCase();
+        return _BeritaItem(
+          id: b['id'] as int? ?? 0,
+          imageUrl: AppConstants.imageUrl(b['gambar'] as String?),
+          badge: kategori,
+          title: b['judul'] as String? ?? '',
+          date: _formatDate(b['tanggal_publish'] as String?),
+        );
+      }).toList();
+    } catch (_) {}
+  }
+
+  Future<void> _fetchGaleri() async {
+    try {
+      final r = await ApiService.instance
+          .get('/galeri', queryParameters: {'per_page': 4, 'page': 1});
+      final list = (r.data['data'] as List<dynamic>?) ?? [];
+      _galeriUrls = list
+          .map((g) => AppConstants.imageUrl(g['foto'] as String?))
+          .where((url) => url.isNotEmpty)
+          .toList();
+    } catch (_) {}
+  }
+
+  Future<void> _fetchInfoPendaftaran() async {
+    try {
+      final r = await ApiService.instance.get('/info-pendaftaran');
+      _tahunAjaran = r.data['tahun_ajaran'] as String? ?? '';
+      _pendaftaranAktif = (r.data['status'] as String?) == 'aktif';
+    } catch (_) {
+      _pendaftaranAktif = false;
+    }
+  }
+
+  void _startBannerTimer() {
+    _bannerTimer = Timer.periodic(const Duration(seconds: 4), (_) {
+      if (!mounted || !_bannerCtrl.hasClients || _bannerUrls.isEmpty) return;
+      final next = (_bannerIndex + 1) % _bannerUrls.length;
+      _bannerCtrl.animateToPage(
+        next,
+        duration: const Duration(milliseconds: 500),
+        curve: Curves.easeInOut,
+      );
+    });
+  }
+
+  // ── Helpers ────────────────────────────────────────────────
+
+  String _mapRole(String role) {
+    switch (role) {
+      case 'orangtua':
+        return 'Orang Tua Murid';
+      case 'admin':
+        return 'Admin';
+      default:
+        return 'Pengguna';
+    }
+  }
+
+  String _formatDate(String? raw) {
+    if (raw == null || raw.isEmpty) return '';
+    try {
+      final dt = DateTime.parse(raw);
+      const months = [
+        '', 'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun',
+        'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'
+      ];
+      return '${dt.day} ${months[dt.month]} ${dt.year}';
+    } catch (_) {
+      return raw;
+    }
+  }
+
+  String get _initials {
+    final parts = _userName.trim().split(' ');
+    if (parts.length >= 2) {
+      return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+    }
+    return _userName.isNotEmpty ? _userName[0].toUpperCase() : '?';
+  }
+
+  String get _firstName =>
+      _userName.isNotEmpty ? _userName.split(' ').first : 'Pengguna';
+
+  // ── Build ───────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -97,11 +192,12 @@ class _HomeScreenState extends State<HomeScreen> {
                 const SizedBox(height: 12),
                 _buildBeritaList(),
                 const SizedBox(height: 20),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: _buildPendaftaranCard(),
-                ),
-                const SizedBox(height: 24),
+                if (_pendaftaranAktif)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: _buildPendaftaranCard(),
+                  ),
+                if (_pendaftaranAktif) const SizedBox(height: 24),
                 _buildSectionHeader('Galeri Kegiatan', () {}),
                 const SizedBox(height: 12),
                 _buildGaleriList(),
@@ -116,7 +212,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // ── App Bar ──────────────────────────────────────────────
   SliverAppBar _buildAppBar() {
-    final user = currentUser;
     return SliverAppBar(
       pinned: true,
       elevation: 0,
@@ -130,7 +225,9 @@ class _HomeScreenState extends State<HomeScreen> {
         onTap: () => Navigator.push(
           context,
           AppRoute(page: const ProfilUserScreen()),
-        ).then((_) => setState(() {})),
+        ).then((_) => _fetchProfile().then((_) {
+              if (mounted) setState(() {});
+            })),
         child: Row(
           children: [
             // Avatar circle
@@ -151,14 +248,23 @@ class _HomeScreenState extends State<HomeScreen> {
                 ],
               ),
               child: Center(
-                child: Text(
-                  user.initials,
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 15,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.primary,
-                  ),
-                ),
+                child: _isLoadingData
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          color: AppColors.primary,
+                          strokeWidth: 2,
+                        ),
+                      )
+                    : Text(
+                        _initials,
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.primary,
+                        ),
+                      ),
               ),
             ),
             const SizedBox(width: 12),
@@ -168,7 +274,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
-                    'Halo, ${user.name.split(' ').first}! 👋',
+                    _isLoadingData ? 'Memuat...' : 'Halo, $_firstName! 👋',
                     style: GoogleFonts.plusJakartaSans(
                       fontSize: 15,
                       fontWeight: FontWeight.bold,
@@ -176,7 +282,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                   Text(
-                    user.role,
+                    _userRole,
                     style: GoogleFonts.plusJakartaSans(
                       fontSize: 11,
                       color: AppColors.textSecondary,
@@ -237,6 +343,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // ── Welcome Card ─────────────────────────────────────────
   Widget _buildWelcomeCard() {
+    final displayName = _isLoadingData
+        ? '...'
+        : _userName.split(' ').take(2).join(' ');
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
       child: Container(
@@ -298,7 +408,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
                 Text(
-                  currentUser.name.split(' ').take(2).join(' '),
+                  displayName,
                   style: GoogleFonts.plusJakartaSans(
                     fontSize: 22,
                     fontWeight: FontWeight.bold,
@@ -326,13 +436,62 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // ── Banner Slider ─────────────────────────────────────────
   Widget _buildBannerSlider() {
+    if (_isLoadingData) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: Container(
+            height: 180,
+            color: AppColors.inputBg,
+            child: const Center(
+              child: CircularProgressIndicator(
+                color: AppColors.gold,
+                strokeWidth: 2,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    if (_bannerUrls.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: Container(
+            height: 180,
+            color: AppColors.inputBg,
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.image_outlined,
+                      color: AppColors.textLight, size: 40),
+                  const SizedBox(height: 8),
+                  Text(
+                    'SD Negeri Warialau',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 13,
+                      color: AppColors.textLight,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
     return Column(
       children: [
         SizedBox(
           height: 180,
           child: PageView.builder(
             controller: _bannerCtrl,
-            itemCount: _bannerImages.length,
+            itemCount: _bannerUrls.length,
             onPageChanged: (i) => setState(() => _bannerIndex = i),
             itemBuilder: (_, index) {
               return Padding(
@@ -340,7 +499,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(16),
                   child: CachedNetworkImage(
-                    imageUrl: _bannerImages[index],
+                    imageUrl: _bannerUrls[index],
                     fit: BoxFit.cover,
                     placeholder: (_, __) => Container(
                       color: AppColors.inputBg,
@@ -369,7 +528,7 @@ class _HomeScreenState extends State<HomeScreen> {
         // Dot indicators
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
-          children: List.generate(_bannerImages.length, (i) {
+          children: List.generate(_bannerUrls.length, (i) {
             final active = i == _bannerIndex;
             return AnimatedContainer(
               duration: const Duration(milliseconds: 300),
@@ -429,14 +588,50 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // ── Berita List ───────────────────────────────────────────
   Widget _buildBeritaList() {
+    if (_isLoadingData) {
+      return SizedBox(
+        height: 240,
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          itemCount: 3,
+          separatorBuilder: (_, __) => const SizedBox(width: 12),
+          itemBuilder: (_, __) => Container(
+            width: 230,
+            decoration: BoxDecoration(
+              color: AppColors.inputBg,
+              borderRadius: BorderRadius.circular(16),
+            ),
+          ),
+        ),
+      );
+    }
+
+    if (_beritaItems.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Container(
+          height: 80,
+          alignment: Alignment.center,
+          child: Text(
+            'Belum ada berita',
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 13,
+              color: AppColors.textLight,
+            ),
+          ),
+        ),
+      );
+    }
+
     return SizedBox(
       height: 240,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 16),
-        itemCount: _beritaList.length,
+        itemCount: _beritaItems.length,
         separatorBuilder: (_, __) => const SizedBox(width: 12),
-        itemBuilder: (_, i) => _BeritaCard(item: _beritaList[i]),
+        itemBuilder: (_, i) => _BeritaCard(item: _beritaItems[i]),
       ),
     );
   }
@@ -482,7 +677,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               const SizedBox(height: 4),
               Text(
-                'Tahun Ajaran 2024/2025',
+                'Tahun Ajaran $_tahunAjaran',
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
@@ -490,43 +685,40 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
               const SizedBox(height: 16),
-              GestureDetector(
-                onTap: () {},
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 12,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppColors.primary,
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.primary.withValues(alpha: 0.35),
-                        blurRadius: 12,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        'Daftar Sekarang',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.white,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      const Icon(
-                        Icons.arrow_forward_rounded,
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 12,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.primary,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.primary.withValues(alpha: 0.35),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Daftar Sekarang',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
                         color: AppColors.white,
-                        size: 18,
                       ),
-                    ],
-                  ),
+                    ),
+                    const SizedBox(width: 8),
+                    const Icon(
+                      Icons.arrow_forward_rounded,
+                      color: AppColors.white,
+                      size: 18,
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -538,18 +730,55 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // ── Galeri List ───────────────────────────────────────────
   Widget _buildGaleriList() {
+    if (_isLoadingData) {
+      return SizedBox(
+        height: 128,
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          itemCount: 4,
+          separatorBuilder: (_, __) => const SizedBox(width: 10),
+          itemBuilder: (_, __) => Container(
+            width: 128,
+            height: 128,
+            decoration: BoxDecoration(
+              color: AppColors.inputBg,
+              borderRadius: BorderRadius.circular(14),
+            ),
+          ),
+        ),
+      );
+    }
+
+    if (_galeriUrls.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Container(
+          height: 80,
+          alignment: Alignment.center,
+          child: Text(
+            'Belum ada galeri',
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 13,
+              color: AppColors.textLight,
+            ),
+          ),
+        ),
+      );
+    }
+
     return SizedBox(
       height: 128,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 16),
-        itemCount: _galeriImages.length,
+        itemCount: _galeriUrls.length,
         separatorBuilder: (_, __) => const SizedBox(width: 10),
         itemBuilder: (_, i) {
           return ClipRRect(
             borderRadius: BorderRadius.circular(14),
             child: CachedNetworkImage(
-              imageUrl: _galeriImages[i],
+              imageUrl: _galeriUrls[i],
               width: 128,
               height: 128,
               fit: BoxFit.cover,
@@ -578,12 +807,14 @@ class _HomeScreenState extends State<HomeScreen> {
 // ── Data classes ──────────────────────────────────────────────────────────────
 
 class _BeritaItem {
+  final int id;
   final String imageUrl;
   final String badge;
   final String title;
   final String date;
 
   const _BeritaItem({
+    required this.id,
     required this.imageUrl,
     required this.badge,
     required this.title,
@@ -602,12 +833,12 @@ class _BeritaCard extends StatelessWidget {
     'PRESTASI': Color(0xFFF59E0B),
     'KEGIATAN': Color(0xFF22C55E),
     'INFO': Color(0xFF3B82F6),
+    'PENGUMUMAN': Color(0xFF8B5CF6),
   };
 
   @override
   Widget build(BuildContext context) {
-    final badgeColor =
-        _badgeColor[item.badge] ?? AppColors.gold;
+    final badgeColor = _badgeColor[item.badge] ?? AppColors.gold;
 
     return Container(
       width: 230,

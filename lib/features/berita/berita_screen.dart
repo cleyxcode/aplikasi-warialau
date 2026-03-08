@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:lottie/lottie.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/utils/app_transitions.dart';
 import 'berita_model.dart';
@@ -19,6 +20,8 @@ class _BeritaScreenState extends State<BeritaScreen>
   String _activeFilter = 'Semua';
   String _searchQuery = '';
   bool _isSearchFocused = false;
+  bool _isLoading = true;
+  bool _hasError = false;
   final _focusNode = FocusNode();
 
   late AnimationController _listAnimCtrl;
@@ -31,8 +34,14 @@ class _BeritaScreenState extends State<BeritaScreen>
     _listAnimCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 600),
-    )..forward();
+    );
     _focusNode.addListener(() => setState(() => _isSearchFocused = _focusNode.hasFocus));
+    Future.delayed(const Duration(milliseconds: 1500), () {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        _listAnimCtrl.forward();
+      }
+    });
   }
 
   @override
@@ -62,6 +71,33 @@ class _BeritaScreenState extends State<BeritaScreen>
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return Scaffold(
+        backgroundColor: AppColors.backgroundLight,
+        body: SafeArea(
+          child: Column(
+            children: [
+              _buildAppBar(),
+              Expanded(child: _buildLoadingState()),
+            ],
+          ),
+        ),
+      );
+    }
+    if (_hasError) {
+      return Scaffold(
+        backgroundColor: AppColors.backgroundLight,
+        body: SafeArea(
+          child: Column(
+            children: [
+              _buildAppBar(),
+              Expanded(child: _buildErrorState()),
+            ],
+          ),
+        ),
+      );
+    }
+
     final filtered = _filtered;
     final featured = filtered.isNotEmpty ? filtered.first : null;
     final rest = filtered.length > 1 ? filtered.sublist(1) : <BeritaModel>[];
@@ -296,15 +332,100 @@ class _BeritaScreenState extends State<BeritaScreen>
     );
   }
 
+  Widget _buildLoadingState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Lottie.asset(
+            'lib/animations/loading _school.json',
+            width: 200,
+            height: 200,
+            repeat: true,
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Memuat berita...',
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 14,
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildErrorState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Lottie.asset(
+            'lib/animations/404.json',
+            width: 200,
+            height: 200,
+            repeat: true,
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Gagal memuat berita',
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: AppColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Periksa koneksi internet Anda',
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 13,
+              color: AppColors.textLight,
+            ),
+          ),
+          const SizedBox(height: 20),
+          ElevatedButton.icon(
+            onPressed: () {
+              setState(() {
+                _hasError = false;
+                _isLoading = true;
+              });
+              Future.delayed(const Duration(milliseconds: 1500), () {
+                if (mounted) {
+                  setState(() => _isLoading = false);
+                  _listAnimCtrl.forward(from: 0);
+                }
+              });
+            },
+            icon: const Icon(Icons.refresh_rounded, size: 18),
+            label: Text(
+              'Coba Lagi',
+              style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildEmptyState() {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Icons.article_outlined,
-            size: 64,
-            color: AppColors.textLight.withValues(alpha: 0.5),
+          Lottie.asset(
+            'lib/animations/empty.json',
+            width: 180,
+            height: 180,
+            repeat: true,
           ),
           const SizedBox(height: 16),
           Text(

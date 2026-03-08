@@ -1,7 +1,10 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/services/api_service.dart';
+import '../../core/services/storage_service.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -72,10 +75,47 @@ class _RegisterScreenState extends State<RegisterScreen>
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isLoading = true);
-    await Future.delayed(const Duration(seconds: 2));
-    if (!mounted) return;
-    setState(() => _isLoading = false);
-    Navigator.pushReplacementNamed(context, '/login');
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final response = await ApiService.instance.post(
+        '/auth/register',
+        data: {
+          'name': _namaCtrl.text.trim(),
+          'email': _emailCtrl.text.trim(),
+          'password': _passCtrl.text,
+          'password_confirmation': _confirmCtrl.text,
+          'no_hp': _phoneCtrl.text.trim(),
+        },
+      );
+      if (!mounted) return;
+      await StorageService.saveToken(response.data['token'] as String);
+      setState(() => _isLoading = false);
+      Navigator.pushReplacementNamed(context, '/home');
+    } on DioException catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      final data = e.response?.data;
+      String msg = 'Registrasi gagal. Periksa koneksi Anda.';
+      if (data != null) {
+        if (data['errors'] != null) {
+          final errors = Map<String, dynamic>.from(data['errors']);
+          msg = (errors.values.first as List).first as String;
+        } else if (data['message'] != null) {
+          msg = data['message'] as String;
+        }
+      }
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(msg,
+              style: GoogleFonts.plusJakartaSans(
+                  fontSize: 13, color: AppColors.white)),
+          backgroundColor: AppColors.danger,
+          behavior: SnackBarBehavior.floating,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      );
+    }
   }
 
   Color get _strengthColor => [

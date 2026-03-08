@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:lottie/lottie.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/utils/app_transitions.dart';
 import 'galeri_model.dart';
@@ -17,6 +18,7 @@ class _GaleriScreenState extends State<GaleriScreen>
     with SingleTickerProviderStateMixin {
   String _activeCategory = 'Semua';
   late AnimationController _gridCtrl;
+  bool _isLoading = true;
 
   @override
   void initState() {
@@ -24,7 +26,13 @@ class _GaleriScreenState extends State<GaleriScreen>
     _gridCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 700),
-    )..forward();
+    );
+    Future.delayed(const Duration(milliseconds: 1200), () {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        _gridCtrl.forward();
+      }
+    });
   }
 
   @override
@@ -60,6 +68,18 @@ class _GaleriScreenState extends State<GaleriScreen>
   @override
   Widget build(BuildContext context) {
     final items = _filtered;
+
+    if (_isLoading) {
+      return Scaffold(
+        backgroundColor: AppColors.backgroundLight,
+        body: CustomScrollView(
+          slivers: [
+            _buildAppBar(0),
+            SliverFillRemaining(child: _buildLoadingState()),
+          ],
+        ),
+      );
+    }
 
     return Scaffold(
       backgroundColor: AppColors.backgroundLight,
@@ -215,15 +235,40 @@ class _GaleriScreenState extends State<GaleriScreen>
     );
   }
 
+  Widget _buildLoadingState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Lottie.asset(
+            'lib/animations/loading _school.json',
+            width: 200,
+            height: 200,
+            repeat: true,
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Memuat galeri...',
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 14,
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildEmptyState() {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Icons.photo_library_outlined,
-            size: 64,
-            color: AppColors.textLight.withValues(alpha: 0.5),
+          Lottie.asset(
+            'lib/animations/empty.json',
+            width: 180,
+            height: 180,
+            repeat: true,
           ),
           const SizedBox(height: 16),
           Text(

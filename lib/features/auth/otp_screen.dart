@@ -1,8 +1,10 @@
 import 'dart:async';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/services/api_service.dart';
 
 class OtpScreen extends StatefulWidget {
   const OtpScreen({super.key});
@@ -165,10 +167,55 @@ class _OtpScreenState extends State<OtpScreen> with TickerProviderStateMixin {
       return;
     }
     setState(() => _isLoading = true);
-    await Future.delayed(const Duration(seconds: 2));
-    if (!mounted) return;
-    setState(() => _isLoading = false);
-    Navigator.pushReplacementNamed(context, '/login');
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+    try {
+      final response = await ApiService.instance.post(
+        '/auth/verify-otp',
+        data: {'email': _email, 'otp': _otp},
+      );
+      final resetEmail = response.data['reset_email'] as String? ?? _email;
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      navigator.pushReplacementNamed('/reset-password',
+          arguments: resetEmail);
+    } on DioException catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      _shakeCtrl.forward(from: 0);
+      final msg = e.response?.data['message'] ?? 'Kode OTP tidak valid.';
+      messenger.showSnackBar(SnackBar(
+        content: Text(msg, style: GoogleFonts.plusJakartaSans()),
+        backgroundColor: AppColors.danger,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ));
+    }
+  }
+
+  Future<void> _resend() async {
+    if (_email.isEmpty) return;
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await ApiService.instance
+          .post('/auth/forgot-password', data: {'email': _email});
+      _startTimer();
+      messenger.showSnackBar(SnackBar(
+        content: Text('Kode OTP baru telah dikirim.',
+            style: GoogleFonts.plusJakartaSans()),
+        backgroundColor: AppColors.success,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ));
+    } on DioException catch (e) {
+      final msg = e.response?.data['message'] ?? 'Gagal mengirim ulang OTP.';
+      messenger.showSnackBar(SnackBar(
+        content: Text(msg, style: GoogleFonts.plusJakartaSans()),
+        backgroundColor: AppColors.danger,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ));
+    }
   }
 
   @override
@@ -492,7 +539,7 @@ class _OtpScreenState extends State<OtpScreen> with TickerProviderStateMixin {
                               fontSize: 13, color: AppColors.textSecondary),
                         ),
                         GestureDetector(
-                          onTap: _canResend ? _startTimer : null,
+                          onTap: _canResend ? _resend : null,
                           child: AnimatedDefaultTextStyle(
                             duration: const Duration(milliseconds: 300),
                             style: GoogleFonts.plusJakartaSans(
