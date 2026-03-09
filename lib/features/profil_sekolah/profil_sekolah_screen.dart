@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:shimmer/shimmer.dart';
 import 'package:dio/dio.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/services/api_service.dart';
@@ -108,21 +109,186 @@ class _ProfilSekolahScreenState extends State<ProfilSekolahScreen>
           ),
         ],
         body: _isLoading
-            ? const Center(child: CircularProgressIndicator(color: AppColors.primary, strokeWidth: 2))
+            ? _buildShimmerBody()
             : TabBarView(
-          controller: _tabController,
-          children: [
-            _ProfilTab(data: _data),
-            _VisiMisiTab(data: _data),
-            _SejarahTab(data: _data),
-            _KontakTab(data: _data),
-          ],
+                controller: _tabController,
+                children: [
+                  _ProfilTab(data: _data),
+                  _VisiMisiTab(data: _data),
+                  _SejarahTab(data: _data),
+                  _KontakTab(data: _data),
+                ],
+              ),
+      ),
+    );
+  }
+
+  // ── Shimmer body (mengganti CircularProgressIndicator) ────
+
+  Widget _buildShimmerBody() {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+      physics: const NeverScrollableScrollPhysics(),
+      children: [
+        // Section title
+        _shimmerBox(width: 140, height: 16, radius: 6),
+        const SizedBox(height: 12),
+
+        // Info card shimmer
+        _ShimmerWrap(
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Column(
+              children: List.generate(
+                4,
+                (i) => Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 14,
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 42,
+                        height: 42,
+                        decoration: const BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              width: 70,
+                              height: 10,
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Container(
+                              width: 140,
+                              height: 13,
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(5),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+
+        const SizedBox(height: 20),
+        _shimmerBox(width: 120, height: 16, radius: 6),
+        const SizedBox(height: 12),
+
+        // Second info card shimmer
+        _ShimmerWrap(
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Column(
+              children: List.generate(
+                4,
+                (i) => Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 14,
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 42,
+                        height: 42,
+                        decoration: const BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              width: 60,
+                              height: 10,
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Container(
+                              width: 100,
+                              height: 13,
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(5),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+
+        const SizedBox(height: 20),
+
+        // Akreditasi banner shimmer
+        _ShimmerWrap(
+          child: Container(
+            height: 88,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(18),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _shimmerBox({
+    required double width,
+    required double height,
+    required double radius,
+  }) {
+    return _ShimmerWrap(
+      child: Container(
+        width: width,
+        height: height,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(radius),
         ),
       ),
     );
   }
 
   // ── Header ────────────────────────────────────────────────
+
   Widget _buildHeader() {
     return Container(
       decoration: const BoxDecoration(
@@ -182,14 +348,11 @@ class _ProfilSekolahScreenState extends State<ProfilSekolahScreen>
                           color: AppColors.white,
                         ),
                       ),
-                      _HeaderIconBtn(
-                        icon: Icons.share_rounded,
-                        onTap: () {},
-                      ),
+                      _HeaderIconBtn(icon: Icons.share_rounded, onTap: () {}),
                     ],
                   ),
                   const SizedBox(height: 24),
-                  // Logo
+                  // Logo dengan shimmer placeholder
                   Container(
                     padding: const EdgeInsets.all(4),
                     decoration: BoxDecoration(
@@ -215,6 +378,16 @@ class _ProfilSekolahScreenState extends State<ProfilSekolahScreen>
                         width: 100,
                         height: 100,
                         fit: BoxFit.cover,
+                        // ── Shimmer untuk logo saat loading ──
+                        placeholder: (_, __) => Shimmer.fromColors(
+                          baseColor: const Color(0xFFE0E6EF),
+                          highlightColor: const Color(0xFFF2F5F9),
+                          child: Container(
+                            width: 100,
+                            height: 100,
+                            color: Colors.white,
+                          ),
+                        ),
                         errorWidget: (_, __, ___) => Container(
                           width: 100,
                           height: 100,
@@ -241,7 +414,9 @@ class _ProfilSekolahScreenState extends State<ProfilSekolahScreen>
                   const SizedBox(height: 4),
                   Container(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 4),
+                      horizontal: 12,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.white.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(999),
@@ -267,33 +442,73 @@ class _ProfilSekolahScreenState extends State<ProfilSekolahScreen>
   }
 
   // ── Stats Row ─────────────────────────────────────────────
+
   Widget _buildStatsRow() {
     return Transform.translate(
       offset: const Offset(0, -20),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: Row(
-          children: [
-            _StatCard(
-              icon: Icons.verified_rounded,
-              label: 'Akreditasi',
-              value: _data?.akreditasi ?? 'A',
-            ),
-            const SizedBox(width: 10),
-            _StatCard(
-              icon: Icons.calendar_today_rounded,
-              label: 'Berdiri',
-              value: _data?.tahunBerdiri ?? '1985',
-            ),
-            const SizedBox(width: 10),
-            _StatCard(
-              icon: Icons.meeting_room_rounded,
-              label: 'Kelas',
-              value: _data != null ? '${_data!.jumlahRuangKelas}' : '12',
-            ),
-          ],
-        ),
+        child: _isLoading
+            ? Row(
+                children: List.generate(3, (i) {
+                  final spacer = i < 2
+                      ? const SizedBox(width: 10)
+                      : const SizedBox.shrink();
+                  return [
+                    Expanded(
+                      child: _ShimmerWrap(
+                        child: Container(
+                          height: 100,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        ),
+                      ),
+                    ),
+                    spacer,
+                  ];
+                }).expand((w) => w).toList(),
+              )
+            : Row(
+                children: [
+                  _StatCard(
+                    icon: Icons.verified_rounded,
+                    label: 'Akreditasi',
+                    value: _data?.akreditasi ?? 'A',
+                  ),
+                  const SizedBox(width: 10),
+                  _StatCard(
+                    icon: Icons.calendar_today_rounded,
+                    label: 'Berdiri',
+                    value: _data?.tahunBerdiri ?? '1985',
+                  ),
+                  const SizedBox(width: 10),
+                  _StatCard(
+                    icon: Icons.meeting_room_rounded,
+                    label: 'Kelas',
+                    value: _data != null ? '${_data!.jumlahRuangKelas}' : '12',
+                  ),
+                ],
+              ),
       ),
+    );
+  }
+}
+
+// ── Shimmer Wrapper ───────────────────────────────────────────────────────────
+
+class _ShimmerWrap extends StatelessWidget {
+  final Widget child;
+  const _ShimmerWrap({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return Shimmer.fromColors(
+      baseColor: const Color(0xFFE8EDF2),
+      highlightColor: const Color(0xFFF5F7FA),
+      period: const Duration(milliseconds: 1200),
+      child: child,
     );
   }
 }
@@ -304,10 +519,7 @@ class _TabBarDelegate extends SliverPersistentHeaderDelegate {
   final TabController tabController;
   final List<String> tabs;
 
-  const _TabBarDelegate({
-    required this.tabController,
-    required this.tabs,
-  });
+  const _TabBarDelegate({required this.tabController, required this.tabs});
 
   @override
   double get minExtent => 52;
@@ -316,7 +528,10 @@ class _TabBarDelegate extends SliverPersistentHeaderDelegate {
 
   @override
   Widget build(
-      BuildContext context, double shrinkOffset, bool overlapsContent) {
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) {
     return Container(
       color: AppColors.backgroundLight,
       child: Column(
@@ -493,11 +708,7 @@ class _ProfilTab extends StatelessWidget {
         const SizedBox(height: 12),
         _InfoCard(
           children: [
-            _InfoRow(
-              icon: Icons.tag_rounded,
-              label: 'NPSN',
-              value: '12345678',
-            ),
+            _InfoRow(icon: Icons.tag_rounded, label: 'NPSN', value: '12345678'),
             const _Divider(),
             _InfoRow(
               icon: Icons.badge_rounded,
@@ -638,7 +849,9 @@ class _VisiMisiTab extends StatelessWidget {
                 children: [
                   Container(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 4),
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: AppColors.primary.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(999),
@@ -696,7 +909,9 @@ class _VisiMisiTab extends StatelessWidget {
                 children: [
                   Container(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 4),
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: AppColors.gold.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(999),
@@ -714,45 +929,50 @@ class _VisiMisiTab extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 16),
-              ...(data?.misiList.isNotEmpty == true ? data!.misiList : _misiList).asMap().entries.map((e) {
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        width: 26,
-                        height: 26,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: AppColors.gold.withValues(alpha: 0.15),
-                        ),
-                        child: Center(
-                          child: Text(
-                            '${e.key + 1}',
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.gold,
+              ...(data?.misiList.isNotEmpty == true
+                      ? data!.misiList
+                      : _misiList)
+                  .asMap()
+                  .entries
+                  .map((e) {
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            width: 26,
+                            height: 26,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: AppColors.gold.withValues(alpha: 0.15),
+                            ),
+                            child: Center(
+                              child: Text(
+                                '${e.key + 1}',
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.gold,
+                                ),
+                              ),
                             ),
                           ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          e.value,
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 14,
-                            height: 1.6,
-                            color: AppColors.textPrimary,
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              e.value,
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 14,
+                                height: 1.6,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
                           ),
-                        ),
+                        ],
                       ),
-                    ],
-                  ),
-                );
-              }),
+                    );
+                  }),
             ],
           ),
         ),
@@ -837,11 +1057,13 @@ class _SejarahTab extends StatelessWidget {
         const SizedBox(height: 20),
         _SectionTitle('Tonggak Sejarah'),
         const SizedBox(height: 16),
-        ..._milestones.map((m) => _MilestoneItem(
-              year: m.$1,
-              desc: m.$2,
-              isLast: m == _milestones.last,
-            )),
+        ..._milestones.map(
+          (m) => _MilestoneItem(
+            year: m.$1,
+            desc: m.$2,
+            isLast: m == _milestones.last,
+          ),
+        ),
       ],
     );
   }
@@ -873,7 +1095,6 @@ class _MilestoneItem extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Timeline line + dot
           SizedBox(
             width: 56,
             child: Column(
@@ -900,7 +1121,9 @@ class _MilestoneItem extends StatelessWidget {
                     child: Container(
                       width: 2,
                       margin: const EdgeInsets.symmetric(
-                          horizontal: 21, vertical: 4),
+                        horizontal: 21,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: AppColors.divider,
                         borderRadius: BorderRadius.circular(1),
@@ -911,7 +1134,6 @@ class _MilestoneItem extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 12),
-          // Content
           Expanded(
             child: Padding(
               padding: EdgeInsets.only(bottom: isLast ? 0 : 20),
@@ -966,14 +1188,18 @@ class _KontakTab extends StatelessWidget {
               icon: Icons.location_on_rounded,
               iconColor: AppColors.danger,
               label: 'Alamat',
-              value: data?.alamat.isNotEmpty == true ? data!.alamat : 'Jl. Pendidikan No. 45, Warialau, Kab. Kepulauan Aru, Maluku',
+              value: data?.alamat.isNotEmpty == true
+                  ? data!.alamat
+                  : 'Jl. Pendidikan No. 45, Warialau, Kab. Kepulauan Aru, Maluku',
             ),
             const _Divider(),
             _ContactRow(
               icon: Icons.call_rounded,
               iconColor: AppColors.success,
               label: 'Telepon',
-              value: data?.kontak.isNotEmpty == true ? data!.kontak : '(0911) 123456',
+              value: data?.kontak.isNotEmpty == true
+                  ? data!.kontak
+                  : '(0911) 123456',
             ),
             const _Divider(),
             _ContactRow(
@@ -994,7 +1220,6 @@ class _KontakTab extends StatelessWidget {
         const SizedBox(height: 20),
         _SectionTitle('Lokasi'),
         const SizedBox(height: 12),
-        // Map placeholder
         Container(
           height: 180,
           decoration: BoxDecoration(
@@ -1011,11 +1236,7 @@ class _KontakTab extends StatelessWidget {
           ),
           child: Stack(
             children: [
-              // Grid lines (map-like feel)
-              CustomPaint(
-                painter: _MapGridPainter(),
-                size: Size.infinite,
-              ),
+              CustomPaint(painter: _MapGridPainter(), size: Size.infinite),
               Center(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -1057,7 +1278,9 @@ class _KontakTab extends StatelessWidget {
                   onTap: () {},
                   child: Container(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 8),
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
                     decoration: BoxDecoration(
                       color: AppColors.primary,
                       borderRadius: BorderRadius.circular(10),
@@ -1095,7 +1318,6 @@ class _KontakTab extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 20),
-        // Social media / quick contact
         _SectionTitle('Media Sosial'),
         const SizedBox(height: 12),
         Row(
@@ -1167,7 +1389,6 @@ class _SocialBtn extends StatelessWidget {
   }
 }
 
-// Map grid painter for visual effect
 class _MapGridPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
@@ -1194,7 +1415,6 @@ class _MapGridPainter extends CustomPainter {
 
 class _SectionTitle extends StatelessWidget {
   final String text;
-
   const _SectionTitle(this.text);
 
   @override
@@ -1215,7 +1435,6 @@ class _SectionTitle extends StatelessWidget {
 
 class _InfoCard extends StatelessWidget {
   final List<Widget> children;
-
   const _InfoCard({required this.children});
 
   @override

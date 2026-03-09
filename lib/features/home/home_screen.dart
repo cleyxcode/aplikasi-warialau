@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:shimmer/shimmer.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/services/api_service.dart';
@@ -24,7 +25,6 @@ class _HomeScreenState extends State<HomeScreen> {
   int _bannerIndex = 0;
   Timer? _bannerTimer;
 
-  // ── State dari API ──────────────────────────────────────────
   String _userName = '';
   String _userRole = 'Pengguna';
 
@@ -148,22 +148,17 @@ class _HomeScreenState extends State<HomeScreen> {
 
   String get _initials {
     final parts = _userName.trim().split(' ');
-    if (parts.length >= 2) {
-      return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
-    }
+    if (parts.length >= 2) return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
     return _userName.isNotEmpty ? _userName[0].toUpperCase() : '?';
   }
 
   String get _firstName =>
       _userName.isNotEmpty ? _userName.split(' ').first : 'Pengguna';
 
-  void _goDetailBerita(BeritaModel berita) {
-    Navigator.push(context, AppRoute(page: DetailBeritaScreen(berita: berita)));
-  }
-
-  // ── Navigasi Tab ────────────────────────────────────────────
-  // Index tab sesuai urutan di MainNavigation:
-  // 0 = Beranda | 1 = Berita | 2 = Galeri | 3 = Daftar | 4 = Profil
+  void _goDetailBerita(BeritaModel berita) => Navigator.push(
+    context,
+    AppRoute(page: DetailBeritaScreen(berita: berita)),
+  );
 
   void _goToBerita() => widget.onTabSwitch?.call(1);
   void _goToGaleri() => widget.onTabSwitch?.call(2);
@@ -186,18 +181,17 @@ class _HomeScreenState extends State<HomeScreen> {
                 const SizedBox(height: 16),
                 _buildBannerSlider(),
                 const SizedBox(height: 24),
-                // ✅ Klik "Lihat Semua" → pindah ke tab Berita
                 _buildSectionHeader('Berita Terbaru', _goToBerita),
                 const SizedBox(height: 12),
                 _buildBeritaList(),
                 const SizedBox(height: 20),
-                if (_pendaftaranAktif)
+                if (!_isLoadingData && _pendaftaranAktif)
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: _buildPendaftaranCard(),
                   ),
-                if (_pendaftaranAktif) const SizedBox(height: 24),
-                // ✅ Klik "Lihat Semua" → pindah ke tab Galeri
+                if (!_isLoadingData && _pendaftaranAktif)
+                  const SizedBox(height: 24),
                 _buildSectionHeader('Galeri Kegiatan', _goToGaleri),
                 const SizedBox(height: 12),
                 _buildGaleriList(),
@@ -211,6 +205,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // ── App Bar ──────────────────────────────────────────────
+
   SliverAppBar _buildAppBar() {
     return SliverAppBar(
       pinned: true,
@@ -233,6 +228,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
         child: Row(
           children: [
+            // Avatar
             Container(
               width: 42,
               height: 42,
@@ -251,14 +247,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               child: Center(
                 child: _isLoadingData
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(
-                          color: AppColors.primary,
-                          strokeWidth: 2,
-                        ),
-                      )
+                    ? _shimmerBox(width: 16, height: 16, radius: 8)
                     : Text(
                         _initials,
                         style: GoogleFonts.plusJakartaSans(
@@ -271,27 +260,37 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(width: 12),
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    _isLoadingData ? 'Memuat...' : 'Halo, $_firstName! 👋',
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.textPrimary,
+              child: _isLoadingData
+                  ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        _shimmerBox(width: 130, height: 13, radius: 6),
+                        const SizedBox(height: 5),
+                        _shimmerBox(width: 80, height: 10, radius: 5),
+                      ],
+                    )
+                  : Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          'Halo, $_firstName! 👋',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        Text(
+                          _userRole,
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 11,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                  Text(
-                    _userRole,
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 11,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                ],
-              ),
             ),
           ],
         ),
@@ -343,10 +342,25 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // ── Welcome Card ─────────────────────────────────────────
+
   Widget _buildWelcomeCard() {
-    final displayName = _isLoadingData
-        ? '...'
-        : _userName.split(' ').take(2).join(' ');
+    if (_isLoadingData) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+        child: _ShimmerWrap(
+          child: Container(
+            width: double.infinity,
+            height: 130,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+            ),
+          ),
+        ),
+      );
+    }
+
+    final displayName = _userName.split(' ').take(2).join(' ');
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
@@ -434,20 +448,17 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // ── Banner Slider ─────────────────────────────────────────
+
   Widget _buildBannerSlider() {
     if (_isLoadingData) {
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(16),
+        child: _ShimmerWrap(
           child: Container(
             height: 180,
-            color: AppColors.inputBg,
-            child: const Center(
-              child: CircularProgressIndicator(
-                color: AppColors.gold,
-                strokeWidth: 2,
-              ),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
             ),
           ),
         ),
@@ -495,35 +506,26 @@ class _HomeScreenState extends State<HomeScreen> {
             controller: _bannerCtrl,
             itemCount: _bannerUrls.length,
             onPageChanged: (i) => setState(() => _bannerIndex = i),
-            itemBuilder: (_, index) {
-              return Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(16),
-                  child: CachedNetworkImage(
-                    imageUrl: _bannerUrls[index],
-                    fit: BoxFit.cover,
-                    placeholder: (_, __) => Container(
-                      color: AppColors.inputBg,
-                      child: const Center(
-                        child: CircularProgressIndicator(
-                          color: AppColors.gold,
-                          strokeWidth: 2,
-                        ),
-                      ),
-                    ),
-                    errorWidget: (_, __, ___) => Container(
-                      color: AppColors.inputBg,
-                      child: const Icon(
-                        Icons.image_outlined,
-                        color: AppColors.textLight,
-                        size: 40,
-                      ),
+            itemBuilder: (_, index) => Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: CachedNetworkImage(
+                  imageUrl: _bannerUrls[index],
+                  fit: BoxFit.cover,
+                  placeholder: (_, __) =>
+                      _ShimmerWrap(child: Container(color: Colors.white)),
+                  errorWidget: (_, __, ___) => Container(
+                    color: AppColors.inputBg,
+                    child: const Icon(
+                      Icons.image_outlined,
+                      color: AppColors.textLight,
+                      size: 40,
                     ),
                   ),
                 ),
-              );
-            },
+              ),
+            ),
           ),
         ),
         const SizedBox(height: 12),
@@ -548,6 +550,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // ── Section Header ────────────────────────────────────────
+
   Widget _buildSectionHeader(String title, VoidCallback onTap) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -588,6 +591,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // ── Berita List ───────────────────────────────────────────
+
   Widget _buildBeritaList() {
     if (_isLoadingData) {
       return SizedBox(
@@ -597,11 +601,75 @@ class _HomeScreenState extends State<HomeScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 16),
           itemCount: 3,
           separatorBuilder: (_, __) => const SizedBox(width: 12),
-          itemBuilder: (_, __) => Container(
-            width: 230,
-            decoration: BoxDecoration(
-              color: AppColors.inputBg,
-              borderRadius: BorderRadius.circular(16),
+          itemBuilder: (_, __) => _ShimmerWrap(
+            child: Container(
+              width: 230,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Image placeholder
+                  Container(
+                    height: 130,
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.vertical(
+                        top: Radius.circular(16),
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Badge
+                        Container(
+                          width: 60,
+                          height: 18,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        // Title line 1
+                        Container(
+                          width: double.infinity,
+                          height: 12,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        // Title line 2
+                        Container(
+                          width: 140,
+                          height: 12,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        // Date
+                        Container(
+                          width: 80,
+                          height: 10,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -641,6 +709,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // ── Pendaftaran Card ──────────────────────────────────────
+
   Widget _buildPendaftaranCard() {
     return Container(
       width: double.infinity,
@@ -688,7 +757,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
               const SizedBox(height: 16),
-              // ✅ Tombol "Daftar Sekarang" → pindah ke tab Pendaftaran (index 3)
               GestureDetector(
                 onTap: _goToPendaftaran,
                 child: Container(
@@ -736,6 +804,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // ── Galeri List ───────────────────────────────────────────
+
   Widget _buildGaleriList() {
     if (_isLoadingData) {
       return SizedBox(
@@ -745,12 +814,14 @@ class _HomeScreenState extends State<HomeScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 16),
           itemCount: 4,
           separatorBuilder: (_, __) => const SizedBox(width: 10),
-          itemBuilder: (_, __) => Container(
-            width: 128,
-            height: 128,
-            decoration: BoxDecoration(
-              color: AppColors.inputBg,
-              borderRadius: BorderRadius.circular(14),
+          itemBuilder: (_, __) => _ShimmerWrap(
+            child: Container(
+              width: 128,
+              height: 128,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(14),
+              ),
             ),
           ),
         ),
@@ -781,29 +852,64 @@ class _HomeScreenState extends State<HomeScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 16),
         itemCount: _galeriUrls.length,
         separatorBuilder: (_, __) => const SizedBox(width: 10),
-        itemBuilder: (_, i) {
-          return ClipRRect(
-            borderRadius: BorderRadius.circular(14),
-            child: CachedNetworkImage(
-              imageUrl: _galeriUrls[i],
+        itemBuilder: (_, i) => ClipRRect(
+          borderRadius: BorderRadius.circular(14),
+          child: CachedNetworkImage(
+            imageUrl: _galeriUrls[i],
+            width: 128,
+            height: 128,
+            fit: BoxFit.cover,
+            placeholder: (_, __) => _ShimmerWrap(
+              child: Container(width: 128, height: 128, color: Colors.white),
+            ),
+            errorWidget: (_, __, ___) => Container(
               width: 128,
               height: 128,
-              fit: BoxFit.cover,
-              placeholder: (_, __) =>
-                  Container(width: 128, height: 128, color: AppColors.inputBg),
-              errorWidget: (_, __, ___) => Container(
-                width: 128,
-                height: 128,
-                color: AppColors.inputBg,
-                child: const Icon(
-                  Icons.image_outlined,
-                  color: AppColors.textLight,
-                ),
+              color: AppColors.inputBg,
+              child: const Icon(
+                Icons.image_outlined,
+                color: AppColors.textLight,
               ),
             ),
-          );
-        },
+          ),
+        ),
       ),
+    );
+  }
+
+  // ── Shimmer helper ────────────────────────────────────────
+
+  Widget _shimmerBox({
+    required double width,
+    required double height,
+    required double radius,
+  }) {
+    return _ShimmerWrap(
+      child: Container(
+        width: width,
+        height: height,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(radius),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Shimmer Wrapper ───────────────────────────────────────────────────────────
+
+class _ShimmerWrap extends StatelessWidget {
+  final Widget child;
+  const _ShimmerWrap({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return Shimmer.fromColors(
+      baseColor: const Color(0xFFE8EDF2),
+      highlightColor: const Color(0xFFF5F7FA),
+      period: const Duration(milliseconds: 1200),
+      child: child,
     );
   }
 }
@@ -857,8 +963,11 @@ class _BeritaCard extends StatelessWidget {
                     height: 130,
                     width: double.infinity,
                     fit: BoxFit.cover,
-                    placeholder: (_, __) =>
-                        Container(height: 130, color: AppColors.inputBg),
+                    placeholder: (_, __) => Shimmer.fromColors(
+                      baseColor: const Color(0xFFE8EDF2),
+                      highlightColor: const Color(0xFFF5F7FA),
+                      child: Container(height: 130, color: Colors.white),
+                    ),
                     errorWidget: (_, __, ___) => Container(
                       height: 130,
                       color: AppColors.inputBg,

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:lottie/lottie.dart';
+import 'package:shimmer/shimmer.dart';
 import 'package:dio/dio.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/services/api_service.dart';
@@ -39,7 +40,10 @@ class _GaleriScreenState extends State<GaleriScreen>
 
   Future<void> _fetchGaleri(int page) async {
     if (page == 1) {
-      setState(() { _isLoading = true; _hasError = false; });
+      setState(() {
+        _isLoading = true;
+        _hasError = false;
+      });
     } else {
       setState(() => _isLoadingMore = true);
     }
@@ -105,13 +109,15 @@ class _GaleriScreenState extends State<GaleriScreen>
   Widget build(BuildContext context) {
     final items = _filtered;
 
+    // ── Loading state: shimmer skeleton ──
     if (_isLoading) {
       return Scaffold(
         backgroundColor: AppColors.backgroundLight,
         body: CustomScrollView(
           slivers: [
             _buildAppBar(0),
-            SliverFillRemaining(child: _buildLoadingState()),
+            SliverToBoxAdapter(child: _buildCategoriesShimmer()),
+            SliverToBoxAdapter(child: _buildShimmerGrid()),
           ],
         ),
       );
@@ -161,20 +167,17 @@ class _GaleriScreenState extends State<GaleriScreen>
                     crossAxisSpacing: 10,
                     childAspectRatio: 1,
                   ),
-                  delegate: SliverChildBuilderDelegate(
-                    (ctx, i) {
-                      final item = items[i + 1];
-                      return _AnimatedGridItem(
-                        index: i + 1,
-                        controller: _gridCtrl,
-                        child: _GridTile(
-                          item: item,
-                          onTap: () => _openViewer(i + 1, items),
-                        ),
-                      );
-                    },
-                    childCount: items.length - 1,
-                  ),
+                  delegate: SliverChildBuilderDelegate((ctx, i) {
+                    final item = items[i + 1];
+                    return _AnimatedGridItem(
+                      index: i + 1,
+                      controller: _gridCtrl,
+                      child: _GridTile(
+                        item: item,
+                        onTap: () => _openViewer(i + 1, items),
+                      ),
+                    );
+                  }, childCount: items.length - 1),
                 ),
               ),
             if (_currentPage < _lastPage)
@@ -187,7 +190,8 @@ class _GaleriScreenState extends State<GaleriScreen>
     );
   }
 
-  // ── App Bar ──────────────────────────────────────────────
+  // ── App Bar ───────────────────────────────────────────────
+
   SliverAppBar _buildAppBar(int count) {
     return SliverAppBar(
       pinned: true,
@@ -208,7 +212,7 @@ class _GaleriScreenState extends State<GaleriScreen>
             ),
           ),
           Text(
-            '$count foto',
+            _isLoading ? '...' : '$count foto',
             style: GoogleFonts.plusJakartaSans(
               fontSize: 11,
               color: AppColors.textLight,
@@ -225,7 +229,8 @@ class _GaleriScreenState extends State<GaleriScreen>
     );
   }
 
-  // ── Categories ───────────────────────────────────────────
+  // ── Categories ────────────────────────────────────────────
+
   Widget _buildCategories() {
     return Container(
       color: AppColors.white,
@@ -246,18 +251,21 @@ class _GaleriScreenState extends State<GaleriScreen>
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 220),
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 6),
+                      horizontal: 16,
+                      vertical: 6,
+                    ),
                     decoration: BoxDecoration(
                       color: active ? AppColors.primary : AppColors.inputBg,
                       borderRadius: BorderRadius.circular(999),
                       boxShadow: active
                           ? [
                               BoxShadow(
-                                color:
-                                    AppColors.primary.withValues(alpha: 0.25),
+                                color: AppColors.primary.withValues(
+                                  alpha: 0.25,
+                                ),
                                 blurRadius: 8,
                                 offset: const Offset(0, 3),
-                              )
+                              ),
                             ]
                           : [],
                     ),
@@ -265,8 +273,7 @@ class _GaleriScreenState extends State<GaleriScreen>
                       cat,
                       style: GoogleFonts.plusJakartaSans(
                         fontSize: 13,
-                        fontWeight:
-                            active ? FontWeight.bold : FontWeight.w500,
+                        fontWeight: active ? FontWeight.bold : FontWeight.w500,
                         color: active
                             ? AppColors.white
                             : AppColors.textSecondary,
@@ -277,7 +284,6 @@ class _GaleriScreenState extends State<GaleriScreen>
               },
             ),
           ),
-          // Divider
           const Divider(height: 1, color: AppColors.divider),
           const SizedBox(height: 12),
         ],
@@ -285,12 +291,141 @@ class _GaleriScreenState extends State<GaleriScreen>
     );
   }
 
+  // ── Shimmer: Category bar skeleton ───────────────────────
+
+  Widget _buildCategoriesShimmer() {
+    return Container(
+      color: AppColors.white,
+      child: Column(
+        children: [
+          SizedBox(
+            height: 56,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              itemCount: 5,
+              separatorBuilder: (_, __) => const SizedBox(width: 8),
+              itemBuilder: (_, i) {
+                final widths = [60.0, 80.0, 70.0, 90.0, 65.0];
+                return _ShimmerWrap(
+                  child: Container(
+                    width: widths[i],
+                    height: 34,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          const Divider(height: 1, color: AppColors.divider),
+          const SizedBox(height: 12),
+        ],
+      ),
+    );
+  }
+
+  // ── Shimmer: Full grid skeleton ───────────────────────────
+
+  Widget _buildShimmerGrid() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Column(
+        children: [
+          // Featured tile shimmer
+          _ShimmerWrap(
+            child: Container(
+              height: 200,
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+
+          // 2-column grid shimmer (6 items)
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: 6,
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              mainAxisSpacing: 10,
+              crossAxisSpacing: 10,
+              childAspectRatio: 1,
+            ),
+            itemBuilder: (_, __) => _ShimmerWrap(
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                // Bottom info skeleton overlay
+                child: Align(
+                  alignment: Alignment.bottomLeft,
+                  child: Padding(
+                    padding: const EdgeInsets.all(10),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          width: 50,
+                          height: 10,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(5),
+                          ),
+                        ),
+                        const SizedBox(height: 5),
+                        Container(
+                          width: double.infinity,
+                          height: 10,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(5),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Container(
+                          width: 60,
+                          height: 8,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+        ],
+      ),
+    );
+  }
+
+  // ── Load More ─────────────────────────────────────────────
+
   Widget _buildLoadMoreButton() {
     if (_isLoadingMore) {
-      return const Padding(
-        padding: EdgeInsets.all(16),
-        child: Center(
-          child: CircularProgressIndicator(color: AppColors.primary, strokeWidth: 2),
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        child: _ShimmerWrap(
+          child: Container(
+            height: 48,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
         ),
       );
     }
@@ -307,18 +442,27 @@ class _GaleriScreenState extends State<GaleriScreen>
           foregroundColor: AppColors.primary,
           side: const BorderSide(color: AppColors.primary),
           minimumSize: const Size(double.infinity, 48),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
         ),
       ),
     );
   }
+
+  // ── States ────────────────────────────────────────────────
 
   Widget _buildErrorState() {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Lottie.asset('lib/animations/404.json', width: 200, height: 200, repeat: true),
+          Lottie.asset(
+            'lib/animations/404.json',
+            width: 200,
+            height: 200,
+            repeat: true,
+          ),
           const SizedBox(height: 12),
           Text(
             'Gagal memuat galeri',
@@ -331,41 +475,25 @@ class _GaleriScreenState extends State<GaleriScreen>
           const SizedBox(height: 6),
           Text(
             'Periksa koneksi internet Anda',
-            style: GoogleFonts.plusJakartaSans(fontSize: 13, color: AppColors.textLight),
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 13,
+              color: AppColors.textLight,
+            ),
           ),
           const SizedBox(height: 20),
           ElevatedButton.icon(
             onPressed: () => _fetchGaleri(1),
             icon: const Icon(Icons.refresh_rounded, size: 18),
-            label: Text('Coba Lagi', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold)),
+            label: Text(
+              'Coba Lagi',
+              style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold),
+            ),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primary,
               foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildLoadingState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Lottie.asset(
-            'lib/animations/loading _school.json',
-            width: 200,
-            height: 200,
-            repeat: true,
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'Memuat galeri...',
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 14,
-              color: AppColors.textSecondary,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
           ),
         ],
@@ -407,6 +535,23 @@ class _GaleriScreenState extends State<GaleriScreen>
   }
 }
 
+// ── Shimmer Wrapper ───────────────────────────────────────────────────────────
+
+class _ShimmerWrap extends StatelessWidget {
+  final Widget child;
+  const _ShimmerWrap({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return Shimmer.fromColors(
+      baseColor: const Color(0xFFE8EDF2),
+      highlightColor: const Color(0xFFF5F7FA),
+      period: const Duration(milliseconds: 1200),
+      child: child,
+    );
+  }
+}
+
 // ── Animated Grid Item ────────────────────────────────────────────────────────
 
 class _AnimatedGridItem extends StatelessWidget {
@@ -427,13 +572,15 @@ class _AnimatedGridItem extends StatelessWidget {
 
     final fade = Tween<double>(begin: 0, end: 1).animate(
       CurvedAnimation(
-          parent: controller,
-          curve: Interval(delay, end, curve: Curves.easeOut)),
+        parent: controller,
+        curve: Interval(delay, end, curve: Curves.easeOut),
+      ),
     );
     final scale = Tween<double>(begin: 0.88, end: 1.0).animate(
       CurvedAnimation(
-          parent: controller,
-          curve: Interval(delay, end, curve: Curves.easeOutBack)),
+        parent: controller,
+        curve: Interval(delay, end, curve: Curves.easeOutBack),
+      ),
     );
 
     return FadeTransition(
@@ -464,9 +611,13 @@ class _FeaturedTileState extends State<_FeaturedTile>
   void initState() {
     super.initState();
     _hoverCtrl = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 120));
-    _scaleAnim = Tween<double>(begin: 1.0, end: 0.97)
-        .animate(CurvedAnimation(parent: _hoverCtrl, curve: Curves.easeOut));
+      vsync: this,
+      duration: const Duration(milliseconds: 120),
+    );
+    _scaleAnim = Tween<double>(
+      begin: 1.0,
+      end: 0.97,
+    ).animate(CurvedAnimation(parent: _hoverCtrl, curve: Curves.easeOut));
   }
 
   @override
@@ -492,28 +643,27 @@ class _FeaturedTileState extends State<_FeaturedTile>
             borderRadius: BorderRadius.circular(20),
             child: Stack(
               children: [
-                // Image
                 CachedNetworkImage(
                   imageUrl: widget.item.imageUrl,
                   height: 200,
                   width: double.infinity,
                   fit: BoxFit.cover,
-                  placeholder: (_, __) => Container(
-                    height: 200,
-                    color: AppColors.inputBg,
-                    child: const Center(
-                      child: CircularProgressIndicator(
-                          color: AppColors.gold, strokeWidth: 2),
-                    ),
+                  placeholder: (_, __) => Shimmer.fromColors(
+                    baseColor: const Color(0xFFE8EDF2),
+                    highlightColor: const Color(0xFFF5F7FA),
+                    child: Container(height: 200, color: Colors.white),
                   ),
                   errorWidget: (_, __, ___) => Container(
                     height: 200,
                     color: AppColors.inputBg,
-                    child: const Icon(Icons.image_outlined,
-                        color: AppColors.textLight, size: 40),
+                    child: const Icon(
+                      Icons.image_outlined,
+                      color: AppColors.textLight,
+                      size: 40,
+                    ),
                   ),
                 ),
-                // Gradient
+                // Gradient overlay
                 Positioned.fill(
                   child: DecoratedBox(
                     decoration: BoxDecoration(
@@ -535,7 +685,9 @@ class _FeaturedTileState extends State<_FeaturedTile>
                   left: 12,
                   child: Container(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 5),
+                      horizontal: 10,
+                      vertical: 5,
+                    ),
                     decoration: BoxDecoration(
                       color: AppColors.gold,
                       borderRadius: BorderRadius.circular(999),
@@ -549,8 +701,11 @@ class _FeaturedTileState extends State<_FeaturedTile>
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.star_rounded,
-                            size: 11, color: AppColors.white),
+                        const Icon(
+                          Icons.star_rounded,
+                          size: 11,
+                          color: AppColors.white,
+                        ),
                         const SizedBox(width: 4),
                         Text(
                           'UNGGULAN',
@@ -607,7 +762,6 @@ class _FeaturedTileState extends State<_FeaturedTile>
                     ),
                   ),
                 ),
-                // Tap overlay ripple area
                 Positioned.fill(child: Material(color: Colors.transparent)),
               ],
             ),
@@ -639,9 +793,13 @@ class _GridTileState extends State<_GridTile>
   void initState() {
     super.initState();
     _ctrl = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 120));
-    _scale = Tween<double>(begin: 1.0, end: 0.94)
-        .animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeOut));
+      vsync: this,
+      duration: const Duration(milliseconds: 120),
+    );
+    _scale = Tween<double>(
+      begin: 1.0,
+      end: 0.94,
+    ).animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeOut));
   }
 
   @override
@@ -668,15 +826,20 @@ class _GridTileState extends State<_GridTile>
             child: Stack(
               fit: StackFit.expand,
               children: [
-                // Image
                 CachedNetworkImage(
                   imageUrl: widget.item.imageUrl,
                   fit: BoxFit.cover,
-                  placeholder: (_, __) => Container(color: AppColors.inputBg),
+                  placeholder: (_, __) => Shimmer.fromColors(
+                    baseColor: const Color(0xFFE8EDF2),
+                    highlightColor: const Color(0xFFF5F7FA),
+                    child: Container(color: Colors.white),
+                  ),
                   errorWidget: (_, __, ___) => Container(
                     color: AppColors.inputBg,
-                    child: const Icon(Icons.image_outlined,
-                        color: AppColors.textLight),
+                    child: const Icon(
+                      Icons.image_outlined,
+                      color: AppColors.textLight,
+                    ),
                   ),
                 ),
                 // Gradient

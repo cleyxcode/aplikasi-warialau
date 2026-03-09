@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:lottie/lottie.dart';
+import 'package:shimmer/shimmer.dart';
 import 'package:dio/dio.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/services/api_service.dart';
@@ -32,7 +33,13 @@ class _BeritaScreenState extends State<BeritaScreen>
 
   late AnimationController _listAnimCtrl;
 
-  static const _filters = ['Semua', 'Pengumuman', 'Kegiatan', 'Prestasi', 'Info'];
+  static const _filters = [
+    'Semua',
+    'Pengumuman',
+    'Kegiatan',
+    'Prestasi',
+    'Info',
+  ];
 
   @override
   void initState() {
@@ -41,13 +48,18 @@ class _BeritaScreenState extends State<BeritaScreen>
       vsync: this,
       duration: const Duration(milliseconds: 600),
     );
-    _focusNode.addListener(() => setState(() => _isSearchFocused = _focusNode.hasFocus));
+    _focusNode.addListener(
+      () => setState(() => _isSearchFocused = _focusNode.hasFocus),
+    );
     _fetchBerita(1);
   }
 
   Future<void> _fetchBerita(int page) async {
     if (page == 1) {
-      setState(() { _isLoading = true; _hasError = false; });
+      setState(() {
+        _isLoading = true;
+        _hasError = false;
+      });
     } else {
       setState(() => _isLoadingMore = true);
     }
@@ -92,7 +104,8 @@ class _BeritaScreenState extends State<BeritaScreen>
   List<BeritaModel> get _filtered {
     return _beritaList.where((b) {
       final matchCat = _activeFilter == 'Semua' || b.category == _activeFilter;
-      final matchSearch = _searchQuery.isEmpty ||
+      final matchSearch =
+          _searchQuery.isEmpty ||
           b.title.toLowerCase().contains(_searchQuery.toLowerCase());
       return matchCat && matchSearch;
     }).toList();
@@ -108,6 +121,7 @@ class _BeritaScreenState extends State<BeritaScreen>
 
   @override
   Widget build(BuildContext context) {
+    // ── Loading: shimmer skeleton ──
     if (_isLoading) {
       return Scaffold(
         backgroundColor: AppColors.backgroundLight,
@@ -115,12 +129,13 @@ class _BeritaScreenState extends State<BeritaScreen>
           child: Column(
             children: [
               _buildAppBar(),
-              Expanded(child: _buildLoadingState()),
+              Expanded(child: _buildShimmerState()),
             ],
           ),
         ),
       );
     }
+
     if (_hasError) {
       return Scaffold(
         backgroundColor: AppColors.backgroundLight,
@@ -148,11 +163,8 @@ class _BeritaScreenState extends State<BeritaScreen>
             Expanded(
               child: CustomScrollView(
                 slivers: [
-                  // Search bar
                   SliverToBoxAdapter(child: _buildSearchBar()),
-                  // Filter chips
                   SliverToBoxAdapter(child: _buildFilterRow()),
-                  // Featured
                   if (featured != null)
                     SliverToBoxAdapter(
                       child: _FeaturedCard(
@@ -160,10 +172,10 @@ class _BeritaScreenState extends State<BeritaScreen>
                         onTap: () => _goDetail(featured),
                       ),
                     ),
-                  // Section title
                   if (rest.isNotEmpty)
-                    SliverToBoxAdapter(child: _buildSectionTitle('Berita Terkini')),
-                  // List
+                    SliverToBoxAdapter(
+                      child: _buildSectionTitle('Berita Terkini'),
+                    ),
                   SliverList(
                     delegate: SliverChildBuilderDelegate(
                       (ctx, i) => _AnimatedListItem(
@@ -192,13 +204,11 @@ class _BeritaScreenState extends State<BeritaScreen>
   }
 
   void _goDetail(BeritaModel b) {
-    Navigator.push(
-      context,
-      AppRoute(page: DetailBeritaScreen(berita: b)),
-    );
+    Navigator.push(context, AppRoute(page: DetailBeritaScreen(berita: b)));
   }
 
-  // ── App Bar ──────────────────────────────────────────────
+  // ── App Bar ───────────────────────────────────────────────
+
   Widget _buildAppBar() {
     return Container(
       height: 56,
@@ -209,7 +219,7 @@ class _BeritaScreenState extends State<BeritaScreen>
       ),
       child: Row(
         children: [
-          const SizedBox(width: 48), // spacer
+          const SizedBox(width: 48),
           Expanded(
             child: Text(
               'Berita & Pengumuman',
@@ -233,7 +243,8 @@ class _BeritaScreenState extends State<BeritaScreen>
     );
   }
 
-  // ── Search Bar ───────────────────────────────────────────
+  // ── Search Bar ────────────────────────────────────────────
+
   Widget _buildSearchBar() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
@@ -252,7 +263,7 @@ class _BeritaScreenState extends State<BeritaScreen>
                     color: AppColors.primary.withValues(alpha: 0.12),
                     blurRadius: 12,
                     offset: const Offset(0, 4),
-                  )
+                  ),
                 ]
               : [],
         ),
@@ -309,7 +320,8 @@ class _BeritaScreenState extends State<BeritaScreen>
     );
   }
 
-  // ── Filter Row ───────────────────────────────────────────
+  // ── Filter Row ────────────────────────────────────────────
+
   Widget _buildFilterRow() {
     return SizedBox(
       height: 56,
@@ -338,7 +350,7 @@ class _BeritaScreenState extends State<BeritaScreen>
                           color: AppColors.primary.withValues(alpha: 0.25),
                           blurRadius: 8,
                           offset: const Offset(0, 3),
-                        )
+                        ),
                       ]
                     : [],
               ),
@@ -371,12 +383,20 @@ class _BeritaScreenState extends State<BeritaScreen>
     );
   }
 
+  // ── Load More ─────────────────────────────────────────────
+
   Widget _buildLoadMoreButton() {
     if (_isLoadingMore) {
-      return const Padding(
-        padding: EdgeInsets.all(16),
-        child: Center(
-          child: CircularProgressIndicator(color: AppColors.primary, strokeWidth: 2),
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        child: _ShimmerWrap(
+          child: Container(
+            height: 48,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
         ),
       );
     }
@@ -393,35 +413,233 @@ class _BeritaScreenState extends State<BeritaScreen>
           foregroundColor: AppColors.primary,
           side: const BorderSide(color: AppColors.primary),
           minimumSize: const Size(double.infinity, 48),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildLoadingState() {
-    return Center(
+  // ── Shimmer skeleton (mengganti Lottie loading) ───────────
+
+  Widget _buildShimmerState() {
+    return SingleChildScrollView(
+      physics: const NeverScrollableScrollPhysics(),
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Lottie.asset(
-            'lib/animations/loading _school.json',
-            width: 200,
-            height: 200,
-            repeat: true,
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'Memuat berita...',
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 14,
-              color: AppColors.textSecondary,
+          // Search bar shimmer
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+            child: _ShimmerWrap(
+              child: Container(
+                height: 48,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
             ),
           ),
+
+          // Filter chips shimmer
+          SizedBox(
+            height: 56,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              itemCount: 5,
+              separatorBuilder: (_, __) => const SizedBox(width: 8),
+              itemBuilder: (_, i) {
+                final widths = [60.0, 100.0, 80.0, 80.0, 55.0];
+                return _ShimmerWrap(
+                  child: Container(
+                    width: widths[i],
+                    height: 34,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+
+          // Featured card shimmer
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+            child: _ShimmerWrap(
+              child: Container(
+                height: 220,
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                // Overlay text skeleton di bawah
+                child: Align(
+                  alignment: Alignment.bottomLeft,
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          width: 70,
+                          height: 16,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Container(
+                          width: double.infinity,
+                          height: 14,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Container(
+                          width: 200,
+                          height: 14,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Container(
+                          width: 120,
+                          height: 11,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(5),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+
+          // Section title shimmer
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
+            child: _ShimmerWrap(
+              child: Container(
+                width: 120,
+                height: 16,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+              ),
+            ),
+          ),
+
+          // List item shimmers
+          ...List.generate(4, (i) => _buildListItemShimmer()),
         ],
       ),
     );
   }
+
+  Widget _buildListItemShimmer() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      child: _ShimmerWrap(
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Thumbnail
+              Container(
+                width: 90,
+                height: 90,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              const SizedBox(width: 14),
+              // Text content
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Badge
+                    Container(
+                      width: 65,
+                      height: 18,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    // Title line 1
+                    Container(
+                      width: double.infinity,
+                      height: 13,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(5),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    // Title line 2
+                    Container(
+                      width: 160,
+                      height: 13,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(5),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    // Date
+                    Container(
+                      width: 90,
+                      height: 10,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    // Read more
+                    Container(
+                      width: 110,
+                      height: 11,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ── Error / Empty states ──────────────────────────────────
 
   Widget _buildErrorState() {
     return Center(
@@ -506,6 +724,23 @@ class _BeritaScreenState extends State<BeritaScreen>
   }
 }
 
+// ── Shimmer Wrapper ───────────────────────────────────────────────────────────
+
+class _ShimmerWrap extends StatelessWidget {
+  final Widget child;
+  const _ShimmerWrap({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return Shimmer.fromColors(
+      baseColor: const Color(0xFFE8EDF2),
+      highlightColor: const Color(0xFFF5F7FA),
+      period: const Duration(milliseconds: 1200),
+      child: child,
+    );
+  }
+}
+
 // ── Animated List Item ────────────────────────────────────────────────────────
 
 class _AnimatedListItem extends StatelessWidget {
@@ -525,15 +760,17 @@ class _AnimatedListItem extends StatelessWidget {
     final end = (start + 0.4).clamp(0.0, 1.0);
     final fade = Tween<double>(begin: 0, end: 1).animate(
       CurvedAnimation(
-          parent: controller,
-          curve: Interval(start, end, curve: Curves.easeOut)),
-    );
-    final slide = Tween<Offset>(
-      begin: const Offset(0, 0.25),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(
         parent: controller,
-        curve: Interval(start, end, curve: Curves.easeOut)));
+        curve: Interval(start, end, curve: Curves.easeOut),
+      ),
+    );
+    final slide = Tween<Offset>(begin: const Offset(0, 0.25), end: Offset.zero)
+        .animate(
+          CurvedAnimation(
+            parent: controller,
+            curve: Interval(start, end, curve: Curves.easeOut),
+          ),
+        );
 
     return FadeTransition(
       opacity: fade,
@@ -562,30 +799,27 @@ class _FeaturedCard extends StatelessWidget {
             borderRadius: BorderRadius.circular(20),
             child: Stack(
               children: [
-                // Image
                 CachedNetworkImage(
                   imageUrl: berita.imageUrl,
                   height: 220,
                   width: double.infinity,
                   fit: BoxFit.cover,
-                  placeholder: (_, __) => Container(
-                    height: 220,
-                    color: AppColors.inputBg,
-                    child: const Center(
-                      child: CircularProgressIndicator(
-                        color: AppColors.gold,
-                        strokeWidth: 2,
-                      ),
-                    ),
+                  placeholder: (_, __) => Shimmer.fromColors(
+                    baseColor: const Color(0xFFE8EDF2),
+                    highlightColor: const Color(0xFFF5F7FA),
+                    child: Container(height: 220, color: Colors.white),
                   ),
                   errorWidget: (_, __, ___) => Container(
                     height: 220,
                     color: AppColors.inputBg,
-                    child: const Icon(Icons.image_outlined,
-                        color: AppColors.textLight, size: 40),
+                    child: const Icon(
+                      Icons.image_outlined,
+                      color: AppColors.textLight,
+                      size: 40,
+                    ),
                   ),
                 ),
-                // Gradient overlay
+                // Gradient
                 Positioned.fill(
                   child: DecoratedBox(
                     decoration: BoxDecoration(
@@ -602,7 +836,7 @@ class _FeaturedCard extends StatelessWidget {
                     ),
                   ),
                 ),
-                // Content overlay
+                // Content
                 Positioned(
                   bottom: 0,
                   left: 0,
@@ -694,8 +928,10 @@ class _BeritaListItemState extends State<_BeritaListItem>
       vsync: this,
       duration: const Duration(milliseconds: 100),
     );
-    _scaleAnim = Tween<double>(begin: 1.0, end: 0.97)
-        .animate(CurvedAnimation(parent: _pressCtrl, curve: Curves.easeOut));
+    _scaleAnim = Tween<double>(
+      begin: 1.0,
+      end: 0.97,
+    ).animate(CurvedAnimation(parent: _pressCtrl, curve: Curves.easeOut));
   }
 
   @override
@@ -743,17 +979,23 @@ class _BeritaListItemState extends State<_BeritaListItem>
                       width: 90,
                       height: 90,
                       fit: BoxFit.cover,
-                      placeholder: (_, __) => Container(
-                        width: 90,
-                        height: 90,
-                        color: AppColors.inputBg,
+                      placeholder: (_, __) => Shimmer.fromColors(
+                        baseColor: const Color(0xFFE8EDF2),
+                        highlightColor: const Color(0xFFF5F7FA),
+                        child: Container(
+                          width: 90,
+                          height: 90,
+                          color: Colors.white,
+                        ),
                       ),
                       errorWidget: (_, __, ___) => Container(
                         width: 90,
                         height: 90,
                         color: AppColors.inputBg,
-                        child: const Icon(Icons.image_outlined,
-                            color: AppColors.textLight),
+                        child: const Icon(
+                          Icons.image_outlined,
+                          color: AppColors.textLight,
+                        ),
                       ),
                     ),
                   ),
@@ -830,7 +1072,6 @@ class _BeritaListItemState extends State<_BeritaListItem>
 
 class _CategoryBadge extends StatelessWidget {
   final String category;
-
   const _CategoryBadge(this.category);
 
   static const _colors = {

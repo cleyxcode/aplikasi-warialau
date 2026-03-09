@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:shimmer/shimmer.dart';
 import '../../core/constants/app_colors.dart';
 import 'berita_model.dart';
 
@@ -28,9 +29,10 @@ class _DetailBeritaScreenState extends State<DetailBeritaScreen>
       vsync: this,
       duration: const Duration(milliseconds: 500),
     );
-    _contentFade = Tween<double>(begin: 0, end: 1).animate(
-      CurvedAnimation(parent: _contentCtrl, curve: Curves.easeOut),
-    );
+    _contentFade = Tween<double>(
+      begin: 0,
+      end: 1,
+    ).animate(CurvedAnimation(parent: _contentCtrl, curve: Curves.easeOut));
     _contentSlide = Tween<Offset>(
       begin: const Offset(0, 0.08),
       end: Offset.zero,
@@ -57,14 +59,13 @@ class _DetailBeritaScreenState extends State<DetailBeritaScreen>
 
   @override
   Widget build(BuildContext context) {
-    final catColor =
-        _categoryColors[widget.berita.category] ?? AppColors.gold;
+    final catColor = _categoryColors[widget.berita.category] ?? AppColors.gold;
 
     return Scaffold(
       backgroundColor: AppColors.backgroundLight,
       body: CustomScrollView(
         slivers: [
-          // Hero Image App Bar
+          // ── Hero Image App Bar ──────────────────────────
           SliverAppBar(
             expandedHeight: 280,
             pinned: true,
@@ -139,18 +140,25 @@ class _DetailBeritaScreenState extends State<DetailBeritaScreen>
               background: Stack(
                 fit: StackFit.expand,
                 children: [
-                  // Hero image
+                  // ── Hero image dengan shimmer placeholder ──
                   Hero(
                     tag: 'berita-hero-${widget.berita.id}',
                     child: CachedNetworkImage(
                       imageUrl: widget.berita.imageUrl,
                       fit: BoxFit.cover,
-                      placeholder: (_, __) =>
-                          Container(color: AppColors.inputBg),
+                      placeholder: (_, __) => Shimmer.fromColors(
+                        baseColor: const Color(0xFFDDE3EA),
+                        highlightColor: const Color(0xFFEEF1F5),
+                        period: const Duration(milliseconds: 1200),
+                        child: Container(color: Colors.white),
+                      ),
                       errorWidget: (_, __, ___) => Container(
                         color: AppColors.inputBg,
-                        child: const Icon(Icons.image_outlined,
-                            color: AppColors.textLight, size: 48),
+                        child: const Icon(
+                          Icons.image_outlined,
+                          color: AppColors.textLight,
+                          size: 48,
+                        ),
                       ),
                     ),
                   ),
@@ -174,7 +182,9 @@ class _DetailBeritaScreenState extends State<DetailBeritaScreen>
                     left: 16,
                     child: Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 5),
+                        horizontal: 12,
+                        vertical: 5,
+                      ),
                       decoration: BoxDecoration(
                         color: catColor,
                         borderRadius: BorderRadius.circular(999),
@@ -201,7 +211,7 @@ class _DetailBeritaScreenState extends State<DetailBeritaScreen>
             ),
           ),
 
-          // Content
+          // ── Content ─────────────────────────────────────
           SliverToBoxAdapter(
             child: FadeTransition(
               opacity: _contentFade,
@@ -218,13 +228,11 @@ class _DetailBeritaScreenState extends State<DetailBeritaScreen>
 
   Widget _buildContent(Color catColor) {
     return Container(
-      decoration: const BoxDecoration(
-        color: AppColors.backgroundLight,
-      ),
+      decoration: const BoxDecoration(color: AppColors.backgroundLight),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // White content card
+          // ── Meta & title card ──────────────────────────
           Container(
             margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
             padding: const EdgeInsets.all(20),
@@ -283,9 +291,7 @@ class _DetailBeritaScreenState extends State<DetailBeritaScreen>
                     ),
                   ],
                 ),
-
                 const SizedBox(height: 12),
-
                 // Title
                 Text(
                   widget.berita.title,
@@ -296,9 +302,7 @@ class _DetailBeritaScreenState extends State<DetailBeritaScreen>
                     height: 1.35,
                   ),
                 ),
-
                 const SizedBox(height: 14),
-
                 // Gold divider
                 Container(
                   height: 2,
@@ -308,9 +312,7 @@ class _DetailBeritaScreenState extends State<DetailBeritaScreen>
                     borderRadius: BorderRadius.circular(999),
                   ),
                 ),
-
                 const SizedBox(height: 14),
-
                 // Author
                 Row(
                   children: [
@@ -354,7 +356,7 @@ class _DetailBeritaScreenState extends State<DetailBeritaScreen>
             ),
           ),
 
-          // Body text
+          // ── Body text card ──────────────────────────────
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
             child: Container(
@@ -377,7 +379,7 @@ class _DetailBeritaScreenState extends State<DetailBeritaScreen>
             ),
           ),
 
-          // Tags
+          // ── Tags ────────────────────────────────────────
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
             child: Column(
@@ -398,7 +400,9 @@ class _DetailBeritaScreenState extends State<DetailBeritaScreen>
                   children: widget.berita.tags.map((tag) {
                     return Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 6),
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
                       decoration: BoxDecoration(
                         color: AppColors.primary.withValues(alpha: 0.06),
                         borderRadius: BorderRadius.circular(8),
@@ -423,7 +427,7 @@ class _DetailBeritaScreenState extends State<DetailBeritaScreen>
 
           const SizedBox(height: 32),
 
-          // Action buttons
+          // ── Action buttons ───────────────────────────────
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(
@@ -436,8 +440,7 @@ class _DetailBeritaScreenState extends State<DetailBeritaScreen>
                     label: _isBookmarked ? 'Tersimpan' : 'Simpan',
                     color: _isBookmarked ? AppColors.gold : AppColors.primary,
                     filled: _isBookmarked,
-                    onTap: () =>
-                        setState(() => _isBookmarked = !_isBookmarked),
+                    onTap: () => setState(() => _isBookmarked = !_isBookmarked),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -468,7 +471,9 @@ class _DetailBeritaScreenState extends State<DetailBeritaScreen>
 
     return paragraphs.asMap().entries.map((e) {
       return Padding(
-        padding: EdgeInsets.only(bottom: e.key < paragraphs.length - 1 ? 16 : 0),
+        padding: EdgeInsets.only(
+          bottom: e.key < paragraphs.length - 1 ? 16 : 0,
+        ),
         child: Text(
           e.value.trim(),
           style: GoogleFonts.plusJakartaSans(
@@ -512,9 +517,13 @@ class _ActionBtnState extends State<_ActionBtn>
   void initState() {
     super.initState();
     _ctrl = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 100));
-    _scale = Tween<double>(begin: 1.0, end: 0.95)
-        .animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeOut));
+      vsync: this,
+      duration: const Duration(milliseconds: 100),
+    );
+    _scale = Tween<double>(
+      begin: 1.0,
+      end: 0.95,
+    ).animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeOut));
   }
 
   @override
@@ -540,17 +549,14 @@ class _ActionBtnState extends State<_ActionBtn>
           decoration: BoxDecoration(
             color: widget.filled ? widget.color : AppColors.white,
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: widget.color,
-              width: 1.5,
-            ),
+            border: Border.all(color: widget.color, width: 1.5),
             boxShadow: widget.filled
                 ? [
                     BoxShadow(
                       color: widget.color.withValues(alpha: 0.3),
                       blurRadius: 12,
                       offset: const Offset(0, 4),
-                    )
+                    ),
                   ]
                 : [],
           ),
