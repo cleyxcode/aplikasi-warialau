@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lottie/lottie.dart';
+import 'package:dio/dio.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/services/api_service.dart';
 import '../../core/utils/app_transitions.dart';
 import 'riwayat_pendaftaran_screen.dart';
 
@@ -116,12 +118,44 @@ class _FormPendaftaranScreenState extends State<FormPendaftaranScreen> {
       return;
     }
     setState(() => _isSubmitting = true);
-    await Future.delayed(const Duration(seconds: 2));
-    if (!mounted) return;
-    setState(() {
-      _isSubmitting = false;
-      _showSuccess = true;
-    });
+    try {
+      final tgl = _tglLahir != null
+          ? '${_tglLahir!.year}-${_tglLahir!.month.toString().padLeft(2, '0')}-${_tglLahir!.day.toString().padLeft(2, '0')}'
+          : '';
+      await ApiService.instance.post('/pendaftaran', data: {
+        'nama_anak': _namaAnakCtrl.text.trim(),
+        'tempat_lahir': _tempatLahirCtrl.text.trim(),
+        'tanggal_lahir': tgl,
+        'jenis_kelamin': _jenisKelamin == 'Laki-laki' ? 'L' : 'P',
+        'agama': _agama,
+        if (_anakKeCtrl.text.isNotEmpty) 'anak_ke': int.tryParse(_anakKeCtrl.text),
+        if (_asalSekolahCtrl.text.isNotEmpty) 'asal_sekolah': _asalSekolahCtrl.text.trim(),
+        if (_nikCtrl.text.isNotEmpty) 'nik': _nikCtrl.text.trim(),
+        if (_noKkCtrl.text.isNotEmpty) 'no_kk': _noKkCtrl.text.trim(),
+        'alamat': _alamatCtrl.text.trim(),
+        if (_namaAyahCtrl.text.isNotEmpty) 'nama_ayah': _namaAyahCtrl.text.trim(),
+        if (_pkrjAyahCtrl.text.isNotEmpty) 'pekerjaan_ayah': _pkrjAyahCtrl.text.trim(),
+        if (_namaIbuCtrl.text.isNotEmpty) 'nama_ibu': _namaIbuCtrl.text.trim(),
+        if (_pkrjIbuCtrl.text.isNotEmpty) 'pekerjaan_ibu': _pkrjIbuCtrl.text.trim(),
+        if (_namaWaliCtrl.text.isNotEmpty) 'nama_wali': _namaWaliCtrl.text.trim(),
+        'no_hp': _noHpCtrl.text.trim(),
+      });
+      if (!mounted) return;
+      setState(() {
+        _isSubmitting = false;
+        _showSuccess = true;
+      });
+    } on DioException catch (e) {
+      if (!mounted) return;
+      setState(() => _isSubmitting = false);
+      final msg = (e.response?.data as Map?)?['message'] as String? ??
+          'Gagal mengirim pendaftaran. Periksa koneksi Anda.';
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(msg, style: GoogleFonts.plusJakartaSans(fontSize: 13)),
+        backgroundColor: AppColors.danger,
+      ));
+      return;
+    }
     await Future.delayed(const Duration(milliseconds: 3200));
     if (!mounted) return;
     Navigator.pushReplacement(

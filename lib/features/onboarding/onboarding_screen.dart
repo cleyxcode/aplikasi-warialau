@@ -1,19 +1,13 @@
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lottie/lottie.dart';
 import 'package:liquid_swipe/liquid_swipe.dart';
 import '../../core/constants/app_colors.dart';
 
-// ── Palette (matches splash screen) ──
+// ── Palette ──────────────────────────────────────────────────────────────────
 class _OB {
-  static const bg1 = Color(0xFF0C1E36); // deep navy
-  static const bg2 = Color(0xFF1F3B61); // mid navy
-  static const bg3 = Color(0xFF112644); // dark blue
-  static const accent = Color(0xFFD4AF37); // gold (from AppColors.gold)
-  static const cardBg = Color(0xFF1A3255); // card surface
-  static const glowBlue = Color(0xFF2E6FD8);
-  static const white = Colors.white;
+  static const accent = Color(0xFFD4AF37);
+  static const cardBg = Color(0xFF1A3255);
 }
 
 class OnboardingScreen extends StatefulWidget {
@@ -28,9 +22,11 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   late LiquidController _liquidController;
   int _currentPage = 0;
 
+  // Halaman yang sudah pernah dikunjungi → animasi teks tidak diputar ulang
+  final Set<int> _visitedPages = {0};
+
   late AnimationController _textController;
   late AnimationController _glowController;
-
   late Animation<double> _textFade;
   late Animation<Offset> _textSlide;
   late Animation<double> _glowPulse;
@@ -94,6 +90,8 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       begin: const Offset(0, 0.25),
       end: Offset.zero,
     ).animate(CurvedAnimation(parent: _textController, curve: Curves.easeOut));
+
+    // Jalankan animasi untuk halaman pertama
     _textController.forward();
 
     _glowController = AnimationController(
@@ -106,8 +104,18 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   }
 
   void _onPageChanged(int page) {
-    setState(() => _currentPage = page);
-    _textController.forward(from: 0);
+    final isNew = !_visitedPages.contains(page);
+    setState(() {
+      _currentPage = page;
+      _visitedPages.add(page);
+    });
+    if (isNew) {
+      // Halaman baru → jalankan animasi teks
+      _textController.forward(from: 0);
+    } else {
+      // Halaman lama (swipe balik) → langsung tampil tanpa animasi
+      _textController.value = 1.0;
+    }
   }
 
   void _nextPage() {
@@ -133,75 +141,43 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     return Scaffold(
       body: Stack(
         children: [
-          // ── Liquid Swipe ──
+          // ── Liquid Swipe (dua arah: kiri ↔ kanan) ───────────────────────
           LiquidSwipe(
-            pages: List.generate(
-              _pages.length,
-              (index) => _buildPage(index, size),
-            ),
+            pages: List.generate(_pages.length, (i) => _buildPage(i, size)),
             liquidController: _liquidController,
             onPageChangeCallback: _onPageChanged,
             waveType: WaveType.liquidReveal,
             enableLoop: false,
             ignoreUserGestureWhileAnimating: true,
-            slideIconWidget: null,
+            enableSideReveal: true, // ← aktifkan swipe dua arah
+            fullTransitionValue: 880,
+            slideIconWidget: const Icon(
+              Icons.arrow_back_ios_rounded,
+              color: Colors.white24,
+              size: 13,
+            ),
+            positionSlideIcon: 0.5,
           ),
 
-          // ── Top bar overlay ──
+          // ── Top bar: hanya tombol Skip (kanan atas) ──────────────────────
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  // Back button
-                  AnimatedOpacity(
-                    opacity: _currentPage > 0 ? 1.0 : 0.0,
-                    duration: const Duration(milliseconds: 250),
-                    child: GestureDetector(
-                      onTap: () => _liquidController.animateToPage(
-                        page: _currentPage - 1,
-                      ),
-                      child: _GlassChip(
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(
-                              Icons.chevron_left_rounded,
-                              color: Colors.white,
-                              size: 16,
-                            ),
-                            const SizedBox(width: 2),
-                            Text(
-                              'Kembali',
-                              style: GoogleFonts.plusJakartaSans(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ],
-                        ),
+              child: Align(
+                alignment: Alignment.topRight,
+                child: GestureDetector(
+                  onTap: _skip,
+                  child: _GlassChip(
+                    child: Text(
+                      'Lewati',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white.withValues(alpha: 0.85),
                       ),
                     ),
                   ),
-                  if (_currentPage == 0) const SizedBox(width: 80),
-
-                  // Skip button
-                  GestureDetector(
-                    onTap: _skip,
-                    child: _GlassChip(
-                      child: Text(
-                        'Lewati',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white.withValues(alpha: 0.85),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
+                ),
               ),
             ),
           ),
@@ -212,8 +188,11 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
   Widget _buildPage(int index, Size size) {
     final p = _pages[index];
-    final isActive = _currentPage == index;
     final isLast = index == _pages.length - 1;
+    // Sudah pernah dikunjungi → tidak pakai wrapper animasi
+    final alreadySeen =
+        _visitedPages.contains(index) &&
+        !(_currentPage == index && _textController.isAnimating);
 
     return Container(
       width: size.width,
@@ -227,13 +206,13 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       ),
       child: Stack(
         children: [
-          // ── Background diagonal stripes ──
+          // Diagonal stripes
           CustomPaint(
             size: Size(size.width, size.height),
             painter: _DiagonalPainter(),
           ),
 
-          // ── Top-right glow blob ──
+          // Glow blob kanan atas
           Positioned(
             top: -60,
             right: -60,
@@ -250,7 +229,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
             ),
           ),
 
-          // ── Bottom-left glow blob ──
+          // Glow blob kiri bawah
           Positioned(
             bottom: -80,
             left: -80,
@@ -264,21 +243,21 @@ class _OnboardingScreenState extends State<OnboardingScreen>
             ),
           ),
 
-          // ── Main content ──
+          // ── Content ───────────────────────────────────────────────────────
           SafeArea(
             child: Column(
               children: [
                 const SizedBox(height: 68),
 
-                // ── Lottie illustration area ──
+                // Lottie area
                 Expanded(
-                  flex: 52,
+                  flex: 50,
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     child: Stack(
                       alignment: Alignment.center,
                       children: [
-                        // Outer glow ring
+                        // Outer ring
                         AnimatedBuilder(
                           animation: _glowPulse,
                           builder: (_, __) => Container(
@@ -295,8 +274,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                             ),
                           ),
                         ),
-
-                        // Inner glow ring
+                        // Inner ring
                         AnimatedBuilder(
                           animation: _glowPulse,
                           builder: (_, __) => Container(
@@ -316,8 +294,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                             ),
                           ),
                         ),
-
-                        // Card backdrop
+                        // Card circle
                         Container(
                           width: size.width * 0.72,
                           height: size.width * 0.72,
@@ -337,7 +314,6 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                             ],
                           ),
                         ),
-
                         // Lottie
                         SizedBox(
                           width: size.width * 0.65,
@@ -345,29 +321,28 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                           child: Lottie.asset(
                             p.lottiePath,
                             fit: BoxFit.contain,
-                            animate: isActive,
-                            errorBuilder: (context, error, stackTrace) => Icon(
+                            animate: _currentPage == index,
+                            errorBuilder: (_, __, ___) => Icon(
                               Icons.school_rounded,
                               size: 100,
                               color: Colors.white.withValues(alpha: 0.3),
                             ),
                           ),
                         ),
-
                         // Star dots
-                        ..._starDots(size, p.glowColor),
+                        ..._starDots(p.glowColor),
                       ],
                     ),
                   ),
                 ),
 
-                // ── Text + Controls ──
+                // Text + controls area
                 Expanded(
-                  flex: 48,
+                  flex: 50,
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(28, 10, 28, 0),
+                    padding: const EdgeInsets.fromLTRB(28, 12, 28, 0),
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
                         // Feature chip
                         Container(
@@ -401,127 +376,89 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                           ),
                         ),
 
-                        const SizedBox(height: 12),
+                        const SizedBox(height: 14),
 
                         // Title + subtitle
-                        isActive
-                            ? SlideTransition(
-                                position: _textSlide,
-                                child: FadeTransition(
-                                  opacity: _textFade,
-                                  child: _buildTextContent(p),
-                                ),
-                              )
-                            : _buildTextContent(p),
+                        // Hanya bungkus animasi jika halaman ini BARU (belum pernah dikunjungi)
+                        // dan sedang aktif
+                        if (_currentPage == index && !alreadySeen)
+                          SlideTransition(
+                            position: _textSlide,
+                            child: FadeTransition(
+                              opacity: _textFade,
+                              child: _buildTextContent(p),
+                            ),
+                          )
+                        else
+                          _buildTextContent(p),
 
                         const Spacer(),
 
-                        // ── Dots + Button row ──
+                        // Dot indicators — tengah
                         Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            // Dot indicators
-                            Row(
-                              children: List.generate(_pages.length, (i) {
-                                return AnimatedContainer(
-                                  duration: const Duration(milliseconds: 350),
-                                  curve: Curves.easeInOut,
-                                  margin: const EdgeInsets.only(right: 6),
-                                  width: _currentPage == i ? 24 : 7,
-                                  height: 7,
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(999),
-                                    color: _currentPage == i
-                                        ? _OB.accent
-                                        : Colors.white.withValues(alpha: 0.2),
-                                  ),
-                                );
-                              }),
-                            ),
-
-                            // Button
-                            if (!isLast)
-                              _AnimatedButton(
-                                onTap: _nextPage,
-                                child: Container(
-                                  width: 56,
-                                  height: 56,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    gradient: LinearGradient(
-                                      begin: Alignment.topLeft,
-                                      end: Alignment.bottomRight,
-                                      colors: [
-                                        _OB.accent,
-                                        const Color(0xFFE8C53A),
-                                      ],
-                                    ),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: _OB.accent.withValues(
-                                          alpha: 0.45,
-                                        ),
-                                        blurRadius: 20,
-                                        offset: const Offset(0, 6),
-                                      ),
-                                    ],
-                                  ),
-                                  child: const Icon(
-                                    Icons.arrow_forward_rounded,
-                                    color: Color(0xFF0C1E36),
-                                    size: 24,
-                                  ),
-                                ),
-                              )
-                            else
-                              _AnimatedButton(
-                                onTap: _start,
-                                child: Container(
-                                  height: 48,
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 28,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    gradient: const LinearGradient(
-                                      colors: [_OB.accent, Color(0xFFE8C53A)],
-                                    ),
-                                    borderRadius: BorderRadius.circular(999),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: _OB.accent.withValues(
-                                          alpha: 0.45,
-                                        ),
-                                        blurRadius: 16,
-                                        offset: const Offset(0, 5),
-                                      ),
-                                    ],
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Text(
-                                        'Daftar Sekarang',
-                                        style: GoogleFonts.plusJakartaSans(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.bold,
-                                          color: const Color(0xFF0C1E36),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 6),
-                                      const Icon(
-                                        Icons.arrow_forward_rounded,
-                                        size: 16,
-                                        color: Color(0xFF0C1E36),
-                                      ),
-                                    ],
-                                  ),
-                                ),
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: List.generate(_pages.length, (i) {
+                            final active = _currentPage == i;
+                            return AnimatedContainer(
+                              duration: const Duration(milliseconds: 350),
+                              curve: Curves.easeInOut,
+                              margin: const EdgeInsets.symmetric(horizontal: 4),
+                              width: active ? 24 : 7,
+                              height: 7,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(999),
+                                color: active
+                                    ? _OB.accent
+                                    : Colors.white.withValues(alpha: 0.2),
                               ),
-                          ],
+                            );
+                          }),
                         ),
 
-                        const SizedBox(height: 28),
+                        const SizedBox(height: 16),
+
+                        // Button — full width
+                        _AnimatedButton(
+                          onTap: isLast ? _start : _nextPage,
+                          child: Container(
+                            width: double.infinity,
+                            height: 52,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(999),
+                              gradient: const LinearGradient(
+                                colors: [_OB.accent, Color(0xFFE8C53A)],
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: _OB.accent.withValues(alpha: 0.40),
+                                  blurRadius: 18,
+                                  offset: const Offset(0, 6),
+                                ),
+                              ],
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  isLast ? 'Daftar Sekarang' : 'Selanjutnya',
+                                  style: GoogleFonts.plusJakartaSans(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.bold,
+                                    color: const Color(0xFF0C1E36),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                const Icon(
+                                  Icons.arrow_forward_rounded,
+                                  size: 18,
+                                  color: Color(0xFF0C1E36),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+
+                        const SizedBox(height: 32),
                       ],
                     ),
                   ),
@@ -536,15 +473,16 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
   Widget _buildTextContent(_OnboardData p) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         RichText(
+          textAlign: TextAlign.center,
           text: TextSpan(
             style: GoogleFonts.plusJakartaSans(
-              fontSize: 28,
+              fontSize: 27,
               fontWeight: FontWeight.w800,
               color: Colors.white,
-              height: 1.15,
+              height: 1.2,
             ),
             children: [
               TextSpan(text: p.titleBefore),
@@ -567,6 +505,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
         const SizedBox(height: 12),
         Text(
           p.subtitle,
+          textAlign: TextAlign.center,
           style: GoogleFonts.plusJakartaSans(
             fontSize: 13.5,
             color: Colors.white.withValues(alpha: 0.6),
@@ -577,26 +516,25 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     );
   }
 
-  List<Widget> _starDots(Size size, Color glowColor) {
-    final positions = [
+  List<Widget> _starDots(Color glowColor) {
+    final pos = [
       {'top': 20.0, 'left': 20.0, 'size': 5.0},
       {'top': 45.0, 'right': 18.0, 'size': 4.0},
       {'bottom': 30.0, 'left': 30.0, 'size': 6.0},
       {'bottom': 55.0, 'right': 30.0, 'size': 4.0},
       {'top': 80.0, 'left': 55.0, 'size': 3.0},
     ];
-
-    return positions.map((pos) {
+    return pos.map((p) {
       return Positioned(
-        top: pos['top'],
-        left: pos['left'],
-        right: pos['right'],
-        bottom: pos['bottom'],
+        top: p['top'],
+        left: p['left'],
+        right: p['right'],
+        bottom: p['bottom'],
         child: AnimatedBuilder(
           animation: _glowPulse,
           builder: (_, __) => Container(
-            width: pos['size'],
-            height: pos['size'],
+            width: p['size'],
+            height: p['size'],
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: Colors.white.withValues(alpha: 0.4 * _glowPulse.value),
@@ -614,7 +552,8 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   }
 }
 
-// ── Glass chip ──
+// ── Glass Chip ────────────────────────────────────────────────────────────────
+
 class _GlassChip extends StatelessWidget {
   final Widget child;
   const _GlassChip({required this.child});
@@ -639,7 +578,8 @@ class _GlassChip extends StatelessWidget {
   }
 }
 
-// ── Diagonal painter ──
+// ── Diagonal Painter ──────────────────────────────────────────────────────────
+
 class _DiagonalPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
@@ -660,7 +600,8 @@ class _DiagonalPainter extends CustomPainter {
   bool shouldRepaint(_DiagonalPainter o) => false;
 }
 
-// ── Bounce-press button ──
+// ── Bounce-press Button ───────────────────────────────────────────────────────
+
 class _AnimatedButton extends StatefulWidget {
   final Widget child;
   final VoidCallback onTap;
@@ -684,7 +625,7 @@ class _AnimatedButtonState extends State<_AnimatedButton>
     );
     _scale = Tween<double>(
       begin: 1.0,
-      end: 0.92,
+      end: 0.94,
     ).animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeOut));
   }
 
@@ -707,6 +648,8 @@ class _AnimatedButtonState extends State<_AnimatedButton>
     );
   }
 }
+
+// ── Data Model ────────────────────────────────────────────────────────────────
 
 class _OnboardData {
   final String lottiePath;

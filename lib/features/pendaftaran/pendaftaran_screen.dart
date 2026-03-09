@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lottie/lottie.dart';
+import 'package:dio/dio.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/services/api_service.dart';
 import '../../core/utils/app_transitions.dart';
 import 'form_pendaftaran_screen.dart';
 import 'riwayat_pendaftaran_screen.dart';
@@ -16,6 +18,9 @@ class PendaftaranScreen extends StatefulWidget {
 class _PendaftaranScreenState extends State<PendaftaranScreen>
     with SingleTickerProviderStateMixin {
   bool _isLoading = true;
+  bool _pendaftaranTutup = false;
+  Map<String, dynamic>? _info;
+
   late AnimationController _fadeController;
   late Animation<double> _fadeAnim;
   late Animation<Offset> _slideAnim;
@@ -38,12 +43,43 @@ class _PendaftaranScreenState extends State<PendaftaranScreen>
       end: Offset.zero,
     ).animate(CurvedAnimation(parent: _fadeController, curve: Curves.easeOut));
 
-    Future.delayed(const Duration(milliseconds: 1200), () {
-      if (mounted) {
-        setState(() => _isLoading = false);
-        _fadeController.forward();
-      }
-    });
+    _fetchInfo();
+  }
+
+  Future<void> _fetchInfo() async {
+    setState(() => _isLoading = true);
+    try {
+      final resp = await ApiService.instance.get('/info-pendaftaran');
+      setState(() {
+        _info = resp.data as Map<String, dynamic>;
+        _pendaftaranTutup = false;
+        _isLoading = false;
+      });
+      _fadeController.forward();
+    } on DioException catch (e) {
+      setState(() {
+        _isLoading = false;
+        _pendaftaranTutup = e.response?.statusCode == 404;
+      });
+      _fadeController.forward();
+    }
+  }
+
+  static String _fmtDate(String? raw) {
+    if (raw == null || raw.isEmpty) return '-';
+    try {
+      final dt = DateTime.parse(raw);
+      const m = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agt','Sep','Okt','Nov','Des'];
+      return '${dt.day} ${m[dt.month - 1]}\n${dt.year}';
+    } catch (_) { return raw; }
+  }
+
+  int _sisaHari() {
+    final tutup = _info?['tanggal_tutup'] as String?;
+    if (tutup == null) return 0;
+    try {
+      return DateTime.parse(tutup).difference(DateTime.now()).inDays;
+    } catch (_) { return 0; }
   }
 
   @override
@@ -115,9 +151,7 @@ class _PendaftaranScreenState extends State<PendaftaranScreen>
                       onTap: () {
                         Navigator.push(
                           context,
-                          AppRoute(
-                            page: const RiwayatPendaftaranScreen(),
-                          ),
+                          AppRoute(page: const RiwayatPendaftaranScreen()),
                         );
                       },
                       child: Container(
@@ -137,24 +171,27 @@ class _PendaftaranScreenState extends State<PendaftaranScreen>
                   ),
                 ],
               ),
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const SizedBox(height: 16),
-                      _buildHeroCard(),
-                      const SizedBox(height: 16),
-                      _buildInfoCardsRow(),
-                      const SizedBox(height: 16),
-                      _buildSyaratCard(),
-                      const SizedBox(height: 16),
-                      _buildCtaButton(),
-                    ],
+              if (_pendaftaranTutup)
+                SliverFillRemaining(child: _buildTutupState())
+              else
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SizedBox(height: 16),
+                        _buildHeroCard(),
+                        const SizedBox(height: 16),
+                        _buildInfoCardsRow(),
+                        const SizedBox(height: 16),
+                        _buildSyaratCard(),
+                        const SizedBox(height: 16),
+                        _buildCtaButton(),
+                      ],
+                    ),
                   ),
                 ),
-              ),
             ],
           ),
         ),
@@ -162,7 +199,65 @@ class _PendaftaranScreenState extends State<PendaftaranScreen>
     );
   }
 
+  Widget _buildTutupState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: AppColors.warning.withValues(alpha: 0.12),
+              ),
+              child: const Icon(Icons.lock_clock_rounded, color: AppColors.warning, size: 40),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              'Pendaftaran Ditutup',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'Saat ini tidak ada periode pendaftaran yang sedang dibuka. Pantau terus informasi terbaru dari sekolah.',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 14,
+                color: AppColors.textSecondary,
+                height: 1.6,
+              ),
+            ),
+            const SizedBox(height: 28),
+            OutlinedButton.icon(
+              onPressed: _fetchInfo,
+              icon: const Icon(Icons.refresh_rounded, size: 18),
+              label: Text('Cek Lagi', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold)),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.primary,
+                side: const BorderSide(color: AppColors.primary),
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildHeroCard() {
+    final tahunAjaran = _info?['tahun_ajaran'] as String? ?? '-';
+    final status = _info?['status'] as String? ?? 'aktif';
+    final isAktif = status == 'aktif';
+    final sisaHari = _sisaHari();
+
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
@@ -170,10 +265,7 @@ class _PendaftaranScreenState extends State<PendaftaranScreen>
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            Color(0xFF1F3B61),
-            Color(0xFF2D5A9B),
-          ],
+          colors: [Color(0xFF1F3B61), Color(0xFF2D5A9B)],
         ),
         boxShadow: [
           BoxShadow(
@@ -187,13 +279,10 @@ class _PendaftaranScreenState extends State<PendaftaranScreen>
         borderRadius: BorderRadius.circular(20),
         child: Stack(
           children: [
-            // Decorative blobs
             Positioned(
-              top: -40,
-              right: -40,
+              top: -40, right: -40,
               child: Container(
-                width: 160,
-                height: 160,
+                width: 160, height: 160,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: AppColors.white.withValues(alpha: 0.06),
@@ -201,19 +290,15 @@ class _PendaftaranScreenState extends State<PendaftaranScreen>
               ),
             ),
             Positioned(
-              bottom: -50,
-              left: -30,
+              bottom: -50, left: -30,
               child: Container(
-                width: 140,
-                height: 140,
+                width: 140, height: 140,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: AppColors.white.withValues(alpha: 0.04),
                 ),
               ),
             ),
-
-            // Content
             Padding(
               padding: const EdgeInsets.all(24),
               child: Column(
@@ -230,7 +315,7 @@ class _PendaftaranScreenState extends State<PendaftaranScreen>
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Tahun Ajaran\n2024/2025',
+                    'Tahun Ajaran\n$tahunAjaran',
                     style: GoogleFonts.plusJakartaSans(
                       fontSize: 26,
                       fontWeight: FontWeight.bold,
@@ -242,49 +327,47 @@ class _PendaftaranScreenState extends State<PendaftaranScreen>
                   Row(
                     children: [
                       Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 6,
-                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                         decoration: BoxDecoration(
-                          color: AppColors.success.withValues(alpha: 0.15),
+                          color: (isAktif ? AppColors.success : AppColors.danger).withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(999),
                           border: Border.all(
-                            color: AppColors.success.withValues(alpha: 0.4),
+                            color: (isAktif ? AppColors.success : AppColors.danger).withValues(alpha: 0.4),
                           ),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Container(
-                              width: 7,
-                              height: 7,
-                              decoration: const BoxDecoration(
+                              width: 7, height: 7,
+                              decoration: BoxDecoration(
                                 shape: BoxShape.circle,
-                                color: AppColors.success,
+                                color: isAktif ? AppColors.success : AppColors.danger,
                               ),
                             ),
                             const SizedBox(width: 6),
                             Text(
-                              'Dibuka',
+                              isAktif ? 'Dibuka' : 'Ditutup',
                               style: GoogleFonts.plusJakartaSans(
                                 fontSize: 12,
                                 fontWeight: FontWeight.bold,
-                                color: AppColors.success,
+                                color: isAktif ? AppColors.success : AppColors.danger,
                               ),
                             ),
                           ],
                         ),
                       ),
-                      const SizedBox(width: 12),
-                      Text(
-                        'Sisa 12 hari',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
-                          color: AppColors.white.withValues(alpha: 0.8),
+                      if (isAktif && sisaHari >= 0) ...[
+                        const SizedBox(width: 12),
+                        Text(
+                          'Sisa $sisaHari hari',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                            color: AppColors.white.withValues(alpha: 0.8),
+                          ),
                         ),
-                      ),
+                      ],
                     ],
                   ),
                 ],
@@ -301,17 +384,17 @@ class _PendaftaranScreenState extends State<PendaftaranScreen>
       _InfoCardData(
         icon: Icons.calendar_today_rounded,
         label: 'Tanggal Buka',
-        value: '01 Juni\n2024',
+        value: _fmtDate(_info?['tanggal_buka'] as String?),
       ),
       _InfoCardData(
         icon: Icons.event_rounded,
         label: 'Tanggal Tutup',
-        value: '30 Juni\n2024',
+        value: _fmtDate(_info?['tanggal_tutup'] as String?),
       ),
       _InfoCardData(
         icon: Icons.group_rounded,
         label: 'Kuota',
-        value: '100\nSiswa',
+        value: '${_info?['kuota'] ?? '-'}\nSiswa',
       ),
     ];
 
@@ -344,11 +427,7 @@ class _PendaftaranScreenState extends State<PendaftaranScreen>
                       color: AppColors.gold.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: Icon(
-                      item.icon,
-                      color: AppColors.gold,
-                      size: 20,
-                    ),
+                    child: Icon(item.icon, color: AppColors.gold, size: 20),
                   ),
                   const SizedBox(height: 10),
                   Text(
@@ -381,12 +460,12 @@ class _PendaftaranScreenState extends State<PendaftaranScreen>
   }
 
   Widget _buildSyaratCard() {
-    final items = [
-      'Fotokopi Akta Kelahiran',
-      'Fotokopi Kartu Keluarga',
-      'Pas Foto 3\u00d74 (2 lembar)',
-      'Ijazah TK/PAUD (jika ada)',
-    ];
+    final syaratRaw = _info?['syarat'] as String? ?? '';
+    final items = syaratRaw
+        .split('\n')
+        .map((s) => s.replaceFirst(RegExp(r'^\d+\.\s*'), '').trim())
+        .where((s) => s.isNotEmpty)
+        .toList();
 
     return Container(
       decoration: BoxDecoration(
@@ -408,8 +487,7 @@ class _PendaftaranScreenState extends State<PendaftaranScreen>
             child: Row(
               children: [
                 Container(
-                  width: 4,
-                  height: 20,
+                  width: 4, height: 20,
                   decoration: BoxDecoration(
                     color: AppColors.primary,
                     borderRadius: BorderRadius.circular(99),
@@ -438,17 +516,12 @@ class _PendaftaranScreenState extends State<PendaftaranScreen>
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Container(
-                        width: 22,
-                        height: 22,
+                        width: 22, height: 22,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           color: AppColors.gold.withValues(alpha: 0.12),
                         ),
-                        child: const Icon(
-                          Icons.check_rounded,
-                          color: AppColors.gold,
-                          size: 14,
-                        ),
+                        child: const Icon(Icons.check_rounded, color: AppColors.gold, size: 14),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
@@ -476,19 +549,14 @@ class _PendaftaranScreenState extends State<PendaftaranScreen>
   Widget _buildCtaButton() {
     return GestureDetector(
       onTap: () {
-        Navigator.push(
-          context,
-          AppRoute(page: const FormPendaftaranScreen()),
-        );
+        Navigator.push(context, AppRoute(page: const FormPendaftaranScreen()));
       },
       child: Container(
         height: 54,
         width: double.infinity,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(14),
-          gradient: const LinearGradient(
-            colors: [AppColors.gold, Color(0xFFE8C53A)],
-          ),
+          gradient: const LinearGradient(colors: [AppColors.gold, Color(0xFFE8C53A)]),
           boxShadow: [
             BoxShadow(
               color: AppColors.gold.withValues(alpha: 0.35),
@@ -517,9 +585,5 @@ class _InfoCardData {
   final String label;
   final String value;
 
-  const _InfoCardData({
-    required this.icon,
-    required this.label,
-    required this.value,
-  });
+  const _InfoCardData({required this.icon, required this.label, required this.value});
 }

@@ -8,9 +8,12 @@ import '../../core/services/api_service.dart';
 import '../../core/utils/app_transitions.dart';
 import '../profil/profil_user_screen.dart';
 import '../notifikasi/notifikasi_screen.dart';
+import '../berita/berita_model.dart';
+import '../berita/detail_berita_screen.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  final void Function(int)? onTabSwitch;
+  const HomeScreen({super.key, this.onTabSwitch});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -26,7 +29,7 @@ class _HomeScreenState extends State<HomeScreen> {
   String _userRole = 'Pengguna';
 
   List<String> _bannerUrls = [];
-  List<_BeritaItem> _beritaItems = [];
+  List<BeritaModel> _beritaItems = [];
   List<String> _galeriUrls = [];
 
   String _tahunAjaran = '';
@@ -83,26 +86,23 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _fetchBerita() async {
     try {
-      final r = await ApiService.instance
-          .get('/berita', queryParameters: {'per_page': 5, 'page': 1});
+      final r = await ApiService.instance.get(
+        '/berita',
+        queryParameters: {'per_page': 5, 'page': 1},
+      );
       final list = (r.data['data'] as List<dynamic>?) ?? [];
-      _beritaItems = list.map((b) {
-        final kategori = (b['kategori'] as String? ?? 'Info').toUpperCase();
-        return _BeritaItem(
-          id: b['id'] as int? ?? 0,
-          imageUrl: AppConstants.imageUrl(b['gambar'] as String?),
-          badge: kategori,
-          title: b['judul'] as String? ?? '',
-          date: _formatDate(b['tanggal_publish'] as String?),
-        );
-      }).toList();
+      _beritaItems = list
+          .map((b) => BeritaModel.fromJson(b as Map<String, dynamic>))
+          .toList();
     } catch (_) {}
   }
 
   Future<void> _fetchGaleri() async {
     try {
-      final r = await ApiService.instance
-          .get('/galeri', queryParameters: {'per_page': 4, 'page': 1});
+      final r = await ApiService.instance.get(
+        '/galeri',
+        queryParameters: {'per_page': 4, 'page': 1},
+      );
       final list = (r.data['data'] as List<dynamic>?) ?? [];
       _galeriUrls = list
           .map((g) => AppConstants.imageUrl(g['foto'] as String?))
@@ -146,20 +146,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  String _formatDate(String? raw) {
-    if (raw == null || raw.isEmpty) return '';
-    try {
-      final dt = DateTime.parse(raw);
-      const months = [
-        '', 'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun',
-        'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'
-      ];
-      return '${dt.day} ${months[dt.month]} ${dt.year}';
-    } catch (_) {
-      return raw;
-    }
-  }
-
   String get _initials {
     final parts = _userName.trim().split(' ');
     if (parts.length >= 2) {
@@ -170,6 +156,18 @@ class _HomeScreenState extends State<HomeScreen> {
 
   String get _firstName =>
       _userName.isNotEmpty ? _userName.split(' ').first : 'Pengguna';
+
+  void _goDetailBerita(BeritaModel berita) {
+    Navigator.push(context, AppRoute(page: DetailBeritaScreen(berita: berita)));
+  }
+
+  // ── Navigasi Tab ────────────────────────────────────────────
+  // Index tab sesuai urutan di MainNavigation:
+  // 0 = Beranda | 1 = Berita | 2 = Galeri | 3 = Daftar | 4 = Profil
+
+  void _goToBerita() => widget.onTabSwitch?.call(1);
+  void _goToGaleri() => widget.onTabSwitch?.call(2);
+  void _goToPendaftaran() => widget.onTabSwitch?.call(3);
 
   // ── Build ───────────────────────────────────────────────────
 
@@ -188,7 +186,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 const SizedBox(height: 16),
                 _buildBannerSlider(),
                 const SizedBox(height: 24),
-                _buildSectionHeader('Berita Terbaru', () {}),
+                // ✅ Klik "Lihat Semua" → pindah ke tab Berita
+                _buildSectionHeader('Berita Terbaru', _goToBerita),
                 const SizedBox(height: 12),
                 _buildBeritaList(),
                 const SizedBox(height: 20),
@@ -198,7 +197,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: _buildPendaftaranCard(),
                   ),
                 if (_pendaftaranAktif) const SizedBox(height: 24),
-                _buildSectionHeader('Galeri Kegiatan', () {}),
+                // ✅ Klik "Lihat Semua" → pindah ke tab Galeri
+                _buildSectionHeader('Galeri Kegiatan', _goToGaleri),
                 const SizedBox(height: 12),
                 _buildGaleriList(),
                 const SizedBox(height: 28),
@@ -222,15 +222,17 @@ class _HomeScreenState extends State<HomeScreen> {
       automaticallyImplyLeading: false,
       toolbarHeight: 64,
       title: GestureDetector(
-        onTap: () => Navigator.push(
-          context,
-          AppRoute(page: const ProfilUserScreen()),
-        ).then((_) => _fetchProfile().then((_) {
-              if (mounted) setState(() {});
-            })),
+        onTap: () =>
+            Navigator.push(
+              context,
+              AppRoute(page: const ProfilUserScreen()),
+            ).then(
+              (_) => _fetchProfile().then((_) {
+                if (mounted) setState(() {});
+              }),
+            ),
         child: Row(
           children: [
-            // Avatar circle
             Container(
               width: 42,
               height: 42,
@@ -295,7 +297,6 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
       actions: [
-        // Notification bell
         Padding(
           padding: const EdgeInsets.only(right: 12),
           child: GestureDetector(
@@ -369,7 +370,6 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         child: Stack(
           children: [
-            // Decorative blobs
             Positioned(
               right: -16,
               bottom: -16,
@@ -394,7 +394,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
             ),
-            // Content
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -467,8 +466,11 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.image_outlined,
-                      color: AppColors.textLight, size: 40),
+                  const Icon(
+                    Icons.image_outlined,
+                    color: AppColors.textLight,
+                    size: 40,
+                  ),
                   const SizedBox(height: 8),
                   Text(
                     'SD Negeri Warialau',
@@ -525,7 +527,6 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
         const SizedBox(height: 12),
-        // Dot indicators
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: List.generate(_bannerUrls.length, (i) {
@@ -631,7 +632,10 @@ class _HomeScreenState extends State<HomeScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 16),
         itemCount: _beritaItems.length,
         separatorBuilder: (_, __) => const SizedBox(width: 12),
-        itemBuilder: (_, i) => _BeritaCard(item: _beritaItems[i]),
+        itemBuilder: (_, i) => _BeritaCard(
+          item: _beritaItems[i],
+          onTap: () => _goDetailBerita(_beritaItems[i]),
+        ),
       ),
     );
   }
@@ -654,7 +658,6 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       child: Stack(
         children: [
-          // Decorative icon
           Positioned(
             right: -8,
             bottom: -8,
@@ -685,40 +688,44 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
               const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 12,
-                ),
-                decoration: BoxDecoration(
-                  color: AppColors.primary,
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.primary.withValues(alpha: 0.35),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      'Daftar Sekarang',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.white,
+              // ✅ Tombol "Daftar Sekarang" → pindah ke tab Pendaftaran (index 3)
+              GestureDetector(
+                onTap: _goToPendaftaran,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 12,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.primary.withValues(alpha: 0.35),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    const Icon(
-                      Icons.arrow_forward_rounded,
-                      color: AppColors.white,
-                      size: 18,
-                    ),
-                  ],
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Daftar Sekarang',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.white,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      const Icon(
+                        Icons.arrow_forward_rounded,
+                        color: AppColors.white,
+                        size: 18,
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],
@@ -782,11 +789,8 @@ class _HomeScreenState extends State<HomeScreen> {
               width: 128,
               height: 128,
               fit: BoxFit.cover,
-              placeholder: (_, __) => Container(
-                width: 128,
-                height: 128,
-                color: AppColors.inputBg,
-              ),
+              placeholder: (_, __) =>
+                  Container(width: 128, height: 128, color: AppColors.inputBg),
               errorWidget: (_, __, ___) => Container(
                 width: 128,
                 height: 128,
@@ -804,30 +808,13 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-// ── Data classes ──────────────────────────────────────────────────────────────
-
-class _BeritaItem {
-  final int id;
-  final String imageUrl;
-  final String badge;
-  final String title;
-  final String date;
-
-  const _BeritaItem({
-    required this.id,
-    required this.imageUrl,
-    required this.badge,
-    required this.title,
-    required this.date,
-  });
-}
-
 // ── Berita Card Widget ────────────────────────────────────────────────────────
 
 class _BeritaCard extends StatelessWidget {
-  final _BeritaItem item;
+  final BeritaModel item;
+  final VoidCallback? onTap;
 
-  const _BeritaCard({required this.item});
+  const _BeritaCard({required this.item, this.onTap});
 
   static const _badgeColor = {
     'PRESTASI': Color(0xFFF59E0B),
@@ -838,115 +825,115 @@ class _BeritaCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final badgeColor = _badgeColor[item.badge] ?? AppColors.gold;
+    final categoryLabel = item.category.toUpperCase();
+    final badgeColor = _badgeColor[categoryLabel] ?? AppColors.gold;
 
-    return Container(
-      width: 230,
-      decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.07),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Image
-          Stack(
-            children: [
-              ClipRRect(
-                borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(16),
-                ),
-                child: CachedNetworkImage(
-                  imageUrl: item.imageUrl,
-                  height: 130,
-                  width: double.infinity,
-                  fit: BoxFit.cover,
-                  placeholder: (_, __) => Container(
-                    height: 130,
-                    color: AppColors.inputBg,
-                  ),
-                  errorWidget: (_, __, ___) => Container(
-                    height: 130,
-                    color: AppColors.inputBg,
-                    child: const Icon(
-                      Icons.image_outlined,
-                      color: AppColors.textLight,
-                      size: 32,
-                    ),
-                  ),
-                ),
-              ),
-              Positioned(
-                top: 10,
-                left: 10,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: badgeColor,
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    item.badge,
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.white,
-                      letterSpacing: 0.8,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          // Info
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 230,
+        decoration: BoxDecoration(
+          color: AppColors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.07),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Stack(
               children: [
-                Text(
-                  item.title,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 13,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.textPrimary,
-                    height: 1.4,
+                ClipRRect(
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(16),
                   ),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    const Icon(
-                      Icons.calendar_today_outlined,
-                      size: 12,
-                      color: AppColors.textLight,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      item.date,
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 11,
+                  child: CachedNetworkImage(
+                    imageUrl: item.imageUrl,
+                    height: 130,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                    placeholder: (_, __) =>
+                        Container(height: 130, color: AppColors.inputBg),
+                    errorWidget: (_, __, ___) => Container(
+                      height: 130,
+                      color: AppColors.inputBg,
+                      child: const Icon(
+                        Icons.image_outlined,
                         color: AppColors.textLight,
+                        size: 32,
                       ),
                     ),
-                  ],
+                  ),
+                ),
+                Positioned(
+                  top: 10,
+                  left: 10,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: badgeColor,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      categoryLabel,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.white,
+                        letterSpacing: 0.8,
+                      ),
+                    ),
+                  ),
                 ),
               ],
             ),
-          ),
-        ],
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    item.title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
+                      height: 1.4,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.calendar_today_outlined,
+                        size: 12,
+                        color: AppColors.textLight,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        item.date,
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 11,
+                          color: AppColors.textLight,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

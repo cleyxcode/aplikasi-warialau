@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:lottie/lottie.dart';
+import 'package:dio/dio.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/services/api_service.dart';
 import '../../core/utils/app_transitions.dart';
 import 'galeri_model.dart';
 import 'galeri_viewer_screen.dart';
@@ -18,7 +20,12 @@ class _GaleriScreenState extends State<GaleriScreen>
     with SingleTickerProviderStateMixin {
   String _activeCategory = 'Semua';
   late AnimationController _gridCtrl;
-  bool _isLoading = true;
+  bool _isLoading = false;
+  bool _hasError = false;
+  List<GaleriItem> _galeriList = [];
+  int _currentPage = 1;
+  int _lastPage = 1;
+  bool _isLoadingMore = false;
 
   @override
   void initState() {
@@ -27,12 +34,43 @@ class _GaleriScreenState extends State<GaleriScreen>
       vsync: this,
       duration: const Duration(milliseconds: 700),
     );
-    Future.delayed(const Duration(milliseconds: 1200), () {
-      if (mounted) {
-        setState(() => _isLoading = false);
-        _gridCtrl.forward();
-      }
-    });
+    _fetchGaleri(1);
+  }
+
+  Future<void> _fetchGaleri(int page) async {
+    if (page == 1) {
+      setState(() { _isLoading = true; _hasError = false; });
+    } else {
+      setState(() => _isLoadingMore = true);
+    }
+    try {
+      final resp = await ApiService.instance.get(
+        '/galeri',
+        queryParameters: {'per_page': 12, 'page': page},
+      );
+      final data = resp.data as Map<String, dynamic>;
+      final items = (data['data'] as List)
+          .map((e) => GaleriItem.fromJson(e as Map<String, dynamic>))
+          .toList();
+      setState(() {
+        if (page == 1) {
+          _galeriList = items;
+        } else {
+          _galeriList = [..._galeriList, ...items];
+        }
+        _currentPage = data['current_page'] as int;
+        _lastPage = data['last_page'] as int;
+        _isLoading = false;
+        _isLoadingMore = false;
+      });
+      if (page == 1) _gridCtrl.forward(from: 0);
+    } on DioException {
+      setState(() {
+        _isLoading = false;
+        _isLoadingMore = false;
+        if (page == 1) _hasError = true;
+      });
+    }
   }
 
   @override
@@ -42,10 +80,8 @@ class _GaleriScreenState extends State<GaleriScreen>
   }
 
   List<GaleriItem> get _filtered {
-    if (_activeCategory == 'Semua') return dummyGaleriList;
-    return dummyGaleriList
-        .where((g) => g.category == _activeCategory)
-        .toList();
+    if (_activeCategory == 'Semua') return _galeriList;
+    return _galeriList.where((g) => g.category == _activeCategory).toList();
   }
 
   void _changeCategory(String cat) {
@@ -76,6 +112,18 @@ class _GaleriScreenState extends State<GaleriScreen>
           slivers: [
             _buildAppBar(0),
             SliverFillRemaining(child: _buildLoadingState()),
+          ],
+        ),
+      );
+    }
+
+    if (_hasError) {
+      return Scaffold(
+        backgroundColor: AppColors.backgroundLight,
+        body: CustomScrollView(
+          slivers: [
+            _buildAppBar(0),
+            SliverFillRemaining(child: _buildErrorState()),
           ],
         ),
       );
@@ -129,6 +177,8 @@ class _GaleriScreenState extends State<GaleriScreen>
                   ),
                 ),
               ),
+            if (_currentPage < _lastPage)
+              SliverToBoxAdapter(child: _buildLoadMoreButton()),
           ] else
             SliverFillRemaining(child: _buildEmptyState()),
           const SliverToBoxAdapter(child: SizedBox(height: 24)),
@@ -230,6 +280,70 @@ class _GaleriScreenState extends State<GaleriScreen>
           // Divider
           const Divider(height: 1, color: AppColors.divider),
           const SizedBox(height: 12),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLoadMoreButton() {
+    if (_isLoadingMore) {
+      return const Padding(
+        padding: EdgeInsets.all(16),
+        child: Center(
+          child: CircularProgressIndicator(color: AppColors.primary, strokeWidth: 2),
+        ),
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+      child: OutlinedButton.icon(
+        onPressed: () => _fetchGaleri(_currentPage + 1),
+        icon: const Icon(Icons.expand_more_rounded),
+        label: Text(
+          'Muat Lebih Banyak',
+          style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold),
+        ),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: AppColors.primary,
+          side: const BorderSide(color: AppColors.primary),
+          minimumSize: const Size(double.infinity, 48),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildErrorState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Lottie.asset('lib/animations/404.json', width: 200, height: 200, repeat: true),
+          const SizedBox(height: 12),
+          Text(
+            'Gagal memuat galeri',
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: AppColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Periksa koneksi internet Anda',
+            style: GoogleFonts.plusJakartaSans(fontSize: 13, color: AppColors.textLight),
+          ),
+          const SizedBox(height: 20),
+          ElevatedButton.icon(
+            onPressed: () => _fetchGaleri(1),
+            icon: const Icon(Icons.refresh_rounded, size: 18),
+            label: Text('Coba Lagi', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          ),
         ],
       ),
     );

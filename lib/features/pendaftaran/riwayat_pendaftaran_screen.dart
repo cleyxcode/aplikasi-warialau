@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lottie/lottie.dart';
+import 'package:dio/dio.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/services/api_service.dart';
 
 class RiwayatPendaftaranScreen extends StatefulWidget {
   const RiwayatPendaftaranScreen({super.key});
@@ -14,7 +16,9 @@ class RiwayatPendaftaranScreen extends StatefulWidget {
 class _RiwayatPendaftaranScreenState extends State<RiwayatPendaftaranScreen>
     with SingleTickerProviderStateMixin {
   bool _dokumenExpanded = false;
-  final bool _hasRegistration = true;
+  bool _hasRegistration = false;
+  bool _isLoading = true;
+  Map<String, dynamic>? _registration;
 
   late AnimationController _fadeCtrl;
   late Animation<double> _fadeAnim;
@@ -32,7 +36,37 @@ class _RiwayatPendaftaranScreenState extends State<RiwayatPendaftaranScreen>
       begin: const Offset(0, 0.06),
       end: Offset.zero,
     ).animate(CurvedAnimation(parent: _fadeCtrl, curve: Curves.easeOut));
-    _fadeCtrl.forward();
+    _fetchRiwayat();
+  }
+
+  Future<void> _fetchRiwayat() async {
+    setState(() => _isLoading = true);
+    try {
+      final resp = await ApiService.instance.get('/pendaftaran/riwayat');
+      final list = resp.data as List;
+      setState(() {
+        _isLoading = false;
+        if (list.isNotEmpty) {
+          _hasRegistration = true;
+          _registration = list.first as Map<String, dynamic>;
+        } else {
+          _hasRegistration = false;
+        }
+      });
+      _fadeCtrl.forward();
+    } on DioException {
+      setState(() { _isLoading = false; _hasRegistration = false; });
+      _fadeCtrl.forward();
+    }
+  }
+
+  static String _fmtDate(String? raw) {
+    if (raw == null || raw.isEmpty) return '-';
+    try {
+      final dt = DateTime.parse(raw);
+      const m = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agt','Sep','Okt','Nov','Des'];
+      return '${dt.day} ${m[dt.month - 1]} ${dt.year}';
+    } catch (_) { return raw; }
   }
 
   @override
@@ -43,6 +77,15 @@ class _RiwayatPendaftaranScreenState extends State<RiwayatPendaftaranScreen>
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return Scaffold(
+        backgroundColor: AppColors.backgroundLight,
+        body: Center(
+          child: CircularProgressIndicator(color: AppColors.primary, strokeWidth: 2),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: AppColors.backgroundLight,
       body: CustomScrollView(
@@ -212,29 +255,22 @@ class _RiwayatPendaftaranScreenState extends State<RiwayatPendaftaranScreen>
   // ── Status Badge ────────────────────────────────────────────────────────────
 
   Widget _buildStatusBadge() {
+    final status = _registration?['status'] as String? ?? 'pending';
+    final cfg = _statusConfig(status);
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [
-            const Color(0xFFFEF9C3),
-            const Color(0xFFFFF7ED),
-          ],
+          colors: [cfg.bgLight, cfg.bgDark],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: const Color(0xFFF59E0B).withValues(alpha: 0.4),
-          width: 1.5,
-        ),
+        border: Border.all(color: cfg.color.withValues(alpha: 0.4), width: 1.5),
         boxShadow: [
-          BoxShadow(
-            color: const Color(0xFFF59E0B).withValues(alpha: 0.12),
-            blurRadius: 16,
-            offset: const Offset(0, 6),
-          ),
+          BoxShadow(color: cfg.color.withValues(alpha: 0.12), blurRadius: 16, offset: const Offset(0, 6)),
         ],
       ),
       child: Row(
@@ -242,85 +278,85 @@ class _RiwayatPendaftaranScreenState extends State<RiwayatPendaftaranScreen>
           Container(
             width: 56,
             height: 56,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: const Color(0xFFF59E0B).withValues(alpha: 0.15),
-            ),
-            child: const Icon(
-              Icons.hourglass_top_rounded,
-              color: Color(0xFFD97706),
-              size: 30,
-            ),
+            decoration: BoxDecoration(shape: BoxShape.circle, color: cfg.color.withValues(alpha: 0.15)),
+            child: Icon(cfg.icon, color: cfg.color, size: 30),
           ),
           const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'Sedang Ditinjau',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 17,
-                    fontWeight: FontWeight.bold,
-                    color: const Color(0xFFD97706),
-                  ),
-                ),
+                Text(cfg.label, style: GoogleFonts.plusJakartaSans(fontSize: 17, fontWeight: FontWeight.bold, color: cfg.color)),
                 const SizedBox(height: 4),
-                Text(
-                  'Berkas sedang diproses oleh tim sekolah',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 12,
-                    color: const Color(0xFFD97706).withValues(alpha: 0.8),
-                    height: 1.4,
-                  ),
-                ),
+                Text(cfg.sub, style: GoogleFonts.plusJakartaSans(fontSize: 12, color: cfg.color.withValues(alpha: 0.8), height: 1.4)),
               ],
             ),
           ),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
             decoration: BoxDecoration(
-              color: const Color(0xFFF59E0B).withValues(alpha: 0.15),
+              color: cfg.color.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(999),
-              border: Border.all(
-                  color: const Color(0xFFF59E0B).withValues(alpha: 0.4)),
+              border: Border.all(color: cfg.color.withValues(alpha: 0.4)),
             ),
-            child: Text(
-              'Proses',
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 11,
-                fontWeight: FontWeight.bold,
-                color: const Color(0xFFD97706),
-              ),
-            ),
+            child: Text(cfg.chip, style: GoogleFonts.plusJakartaSans(fontSize: 11, fontWeight: FontWeight.bold, color: cfg.color)),
           ),
         ],
       ),
     );
   }
 
+  _StatusConfig _statusConfig(String status) {
+    switch (status) {
+      case 'diterima':
+        return _StatusConfig(
+          color: AppColors.success, icon: Icons.check_circle_rounded,
+          label: 'Diterima', sub: 'Selamat! Pendaftaran Anda telah diterima',
+          chip: 'Diterima', bgLight: const Color(0xFFDCFCE7), bgDark: const Color(0xFFF0FDF4),
+        );
+      case 'ditolak':
+        return _StatusConfig(
+          color: AppColors.danger, icon: Icons.cancel_rounded,
+          label: 'Ditolak', sub: 'Maaf, pendaftaran Anda tidak dapat diproses',
+          chip: 'Ditolak', bgLight: const Color(0xFFFEE2E2), bgDark: const Color(0xFFFFF1F2),
+        );
+      default:
+        return _StatusConfig(
+          color: const Color(0xFFD97706), icon: Icons.hourglass_top_rounded,
+          label: 'Sedang Ditinjau', sub: 'Berkas sedang diproses oleh tim sekolah',
+          chip: 'Proses', bgLight: const Color(0xFFFEF9C3), bgDark: const Color(0xFFFFF7ED),
+        );
+    }
+  }
+
   // ── Timeline ────────────────────────────────────────────────────────────────
 
   Widget _buildTimeline() {
+    final status = _registration?['status'] as String? ?? 'pending';
+    final tglDaftar = _fmtDate(_registration?['created_at'] as String?);
+    final isDiterima = status == 'diterima';
+    final isDitolak = status == 'ditolak';
+    final isDone = isDiterima || isDitolak;
+
     final steps = [
       _TimelineStep(
         icon: Icons.send_rounded,
         label: 'Formulir Dikirim',
-        sub: '15 Mei 2024',
+        sub: tglDaftar,
         done: true,
       ),
       _TimelineStep(
         icon: Icons.find_in_page_rounded,
         label: 'Sedang Ditinjau',
-        sub: 'Tim sedang memverifikasi',
-        done: false,
-        active: true,
+        sub: isDone ? 'Selesai ditinjau' : 'Tim sedang memverifikasi',
+        done: isDone,
+        active: !isDone,
       ),
       _TimelineStep(
-        icon: Icons.how_to_reg_rounded,
+        icon: isDiterima ? Icons.how_to_reg_rounded : isDitolak ? Icons.cancel_rounded : Icons.how_to_reg_rounded,
         label: 'Keputusan',
-        sub: 'Menunggu hasil tinjauan',
-        done: false,
+        sub: isDiterima ? 'Diterima' : isDitolak ? 'Ditolak' : 'Menunggu hasil tinjauan',
+        done: isDone,
       ),
     ];
 
@@ -446,11 +482,13 @@ class _RiwayatPendaftaranScreenState extends State<RiwayatPendaftaranScreen>
   // ── Detail Card ─────────────────────────────────────────────────────────────
 
   Widget _buildDetailCard() {
+    final r = _registration ?? {};
+    final info = r['info_pendaftaran'] as Map? ?? {};
     final rows = [
-      ['Nama Anak', 'Budi Santoso'],
-      ['Tahun Ajaran', '2024/2025'],
-      ['Tanggal Daftar', '15 Mei 2024'],
-      ['No. Registrasi', '#SD-2024-0042'],
+      ['Nama Anak', r['nama_anak'] as String? ?? '-'],
+      ['Tahun Ajaran', info['tahun_ajaran'] as String? ?? '-'],
+      ['Tanggal Daftar', _fmtDate(r['created_at'] as String?)],
+      ['No. Registrasi', '#SD-${r['id'] ?? '-'}'],
     ];
 
     return Container(
@@ -754,6 +792,26 @@ class _RiwayatPendaftaranScreenState extends State<RiwayatPendaftaranScreen>
 }
 
 // ── Data models ──────────────────────────────────────────────────────────────
+
+class _StatusConfig {
+  final Color color;
+  final IconData icon;
+  final String label;
+  final String sub;
+  final String chip;
+  final Color bgLight;
+  final Color bgDark;
+
+  const _StatusConfig({
+    required this.color,
+    required this.icon,
+    required this.label,
+    required this.sub,
+    required this.chip,
+    required this.bgLight,
+    required this.bgDark,
+  });
+}
 
 class _TimelineStep {
   final IconData icon;

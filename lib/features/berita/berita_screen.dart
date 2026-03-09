@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:lottie/lottie.dart';
+import 'package:dio/dio.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/services/api_service.dart';
 import '../../core/utils/app_transitions.dart';
 import 'berita_model.dart';
 import 'detail_berita_screen.dart';
@@ -20,8 +22,12 @@ class _BeritaScreenState extends State<BeritaScreen>
   String _activeFilter = 'Semua';
   String _searchQuery = '';
   bool _isSearchFocused = false;
-  bool _isLoading = true;
+  bool _isLoading = false;
   bool _hasError = false;
+  List<BeritaModel> _beritaList = [];
+  int _currentPage = 1;
+  int _lastPage = 1;
+  bool _isLoadingMore = false;
   final _focusNode = FocusNode();
 
   late AnimationController _listAnimCtrl;
@@ -36,12 +42,43 @@ class _BeritaScreenState extends State<BeritaScreen>
       duration: const Duration(milliseconds: 600),
     );
     _focusNode.addListener(() => setState(() => _isSearchFocused = _focusNode.hasFocus));
-    Future.delayed(const Duration(milliseconds: 1500), () {
-      if (mounted) {
-        setState(() => _isLoading = false);
-        _listAnimCtrl.forward();
-      }
-    });
+    _fetchBerita(1);
+  }
+
+  Future<void> _fetchBerita(int page) async {
+    if (page == 1) {
+      setState(() { _isLoading = true; _hasError = false; });
+    } else {
+      setState(() => _isLoadingMore = true);
+    }
+    try {
+      final resp = await ApiService.instance.get(
+        '/berita',
+        queryParameters: {'per_page': 10, 'page': page},
+      );
+      final data = resp.data as Map<String, dynamic>;
+      final items = (data['data'] as List)
+          .map((e) => BeritaModel.fromJson(e as Map<String, dynamic>))
+          .toList();
+      setState(() {
+        if (page == 1) {
+          _beritaList = items;
+        } else {
+          _beritaList = [..._beritaList, ...items];
+        }
+        _currentPage = data['current_page'] as int;
+        _lastPage = data['last_page'] as int;
+        _isLoading = false;
+        _isLoadingMore = false;
+      });
+      if (page == 1) _listAnimCtrl.forward(from: 0);
+    } on DioException {
+      setState(() {
+        _isLoading = false;
+        _isLoadingMore = false;
+        if (page == 1) _hasError = true;
+      });
+    }
   }
 
   @override
@@ -53,7 +90,7 @@ class _BeritaScreenState extends State<BeritaScreen>
   }
 
   List<BeritaModel> get _filtered {
-    return dummyBeritaList.where((b) {
+    return _beritaList.where((b) {
       final matchCat = _activeFilter == 'Semua' || b.category == _activeFilter;
       final matchSearch = _searchQuery.isEmpty ||
           b.title.toLowerCase().contains(_searchQuery.toLowerCase());
@@ -142,6 +179,8 @@ class _BeritaScreenState extends State<BeritaScreen>
                   ),
                   if (filtered.isEmpty)
                     SliverFillRemaining(child: _buildEmptyState()),
+                  if (_currentPage < _lastPage)
+                    SliverToBoxAdapter(child: _buildLoadMoreButton()),
                   const SliverToBoxAdapter(child: SizedBox(height: 24)),
                 ],
               ),
@@ -332,6 +371,34 @@ class _BeritaScreenState extends State<BeritaScreen>
     );
   }
 
+  Widget _buildLoadMoreButton() {
+    if (_isLoadingMore) {
+      return const Padding(
+        padding: EdgeInsets.all(16),
+        child: Center(
+          child: CircularProgressIndicator(color: AppColors.primary, strokeWidth: 2),
+        ),
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+      child: OutlinedButton.icon(
+        onPressed: () => _fetchBerita(_currentPage + 1),
+        icon: const Icon(Icons.expand_more_rounded),
+        label: Text(
+          'Muat Lebih Banyak',
+          style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold),
+        ),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: AppColors.primary,
+          side: const BorderSide(color: AppColors.primary),
+          minimumSize: const Size(double.infinity, 48),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      ),
+    );
+  }
+
   Widget _buildLoadingState() {
     return Center(
       child: Column(
@@ -386,18 +453,7 @@ class _BeritaScreenState extends State<BeritaScreen>
           ),
           const SizedBox(height: 20),
           ElevatedButton.icon(
-            onPressed: () {
-              setState(() {
-                _hasError = false;
-                _isLoading = true;
-              });
-              Future.delayed(const Duration(milliseconds: 1500), () {
-                if (mounted) {
-                  setState(() => _isLoading = false);
-                  _listAnimCtrl.forward(from: 0);
-                }
-              });
-            },
+            onPressed: () => _fetchBerita(1),
             icon: const Icon(Icons.refresh_rounded, size: 18),
             label: Text(
               'Coba Lagi',

@@ -1,7 +1,53 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:dio/dio.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/services/api_service.dart';
+
+class _SekolahData {
+  final String kepalaSekolah;
+  final String akreditasi;
+  final String tahunBerdiri;
+  final int jumlahRuangKelas;
+  final String visi;
+  final List<String> misiList;
+  final String sejarah;
+  final String alamat;
+  final String kontak;
+
+  const _SekolahData({
+    required this.kepalaSekolah,
+    required this.akreditasi,
+    required this.tahunBerdiri,
+    required this.jumlahRuangKelas,
+    required this.visi,
+    required this.misiList,
+    required this.sejarah,
+    required this.alamat,
+    required this.kontak,
+  });
+
+  factory _SekolahData.fromJson(Map<String, dynamic> j) {
+    final misiRaw = j['misi'] as String? ?? '';
+    final misiLines = misiRaw
+        .split('\n')
+        .map((s) => s.replaceFirst(RegExp(r'^\d+\.\s*'), '').trim())
+        .where((s) => s.isNotEmpty)
+        .toList();
+    return _SekolahData(
+      kepalaSekolah: j['kepala_sekolah'] as String? ?? '-',
+      akreditasi: j['akreditasi'] as String? ?? 'B',
+      tahunBerdiri: j['tahun_berdiri'] as String? ?? '-',
+      jumlahRuangKelas: (j['jumlah_ruang_kelas'] as num?)?.toInt() ?? 0,
+      visi: j['visi'] as String? ?? '',
+      misiList: misiLines,
+      sejarah: j['sejarah'] as String? ?? '',
+      alamat: j['alamat'] as String? ?? '-',
+      kontak: j['kontak'] as String? ?? '-',
+    );
+  }
+}
 
 class ProfilSekolahScreen extends StatefulWidget {
   const ProfilSekolahScreen({super.key});
@@ -13,6 +59,8 @@ class ProfilSekolahScreen extends StatefulWidget {
 class _ProfilSekolahScreenState extends State<ProfilSekolahScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  _SekolahData? _data;
+  bool _isLoading = false;
 
   static const _tabs = ['Profil', 'Visi Misi', 'Sejarah', 'Kontak'];
 
@@ -21,6 +69,20 @@ class _ProfilSekolahScreenState extends State<ProfilSekolahScreen>
     super.initState();
     _tabController = TabController(length: _tabs.length, vsync: this);
     _tabController.addListener(() => setState(() {}));
+    _fetchProfil();
+  }
+
+  Future<void> _fetchProfil() async {
+    setState(() => _isLoading = true);
+    try {
+      final resp = await ApiService.instance.get('/profil-sekolah');
+      setState(() {
+        _data = _SekolahData.fromJson(resp.data as Map<String, dynamic>);
+        _isLoading = false;
+      });
+    } on DioException {
+      setState(() => _isLoading = false);
+    }
   }
 
   @override
@@ -45,13 +107,15 @@ class _ProfilSekolahScreenState extends State<ProfilSekolahScreen>
             ),
           ),
         ],
-        body: TabBarView(
+        body: _isLoading
+            ? const Center(child: CircularProgressIndicator(color: AppColors.primary, strokeWidth: 2))
+            : TabBarView(
           controller: _tabController,
-          children: const [
-            _ProfilTab(),
-            _VisiMisiTab(),
-            _SejarahTab(),
-            _KontakTab(),
+          children: [
+            _ProfilTab(data: _data),
+            _VisiMisiTab(data: _data),
+            _SejarahTab(data: _data),
+            _KontakTab(data: _data),
           ],
         ),
       ),
@@ -213,19 +277,19 @@ class _ProfilSekolahScreenState extends State<ProfilSekolahScreen>
             _StatCard(
               icon: Icons.verified_rounded,
               label: 'Akreditasi',
-              value: 'A',
+              value: _data?.akreditasi ?? 'A',
             ),
             const SizedBox(width: 10),
             _StatCard(
               icon: Icons.calendar_today_rounded,
               label: 'Berdiri',
-              value: '1985',
+              value: _data?.tahunBerdiri ?? '1985',
             ),
             const SizedBox(width: 10),
             _StatCard(
               icon: Icons.meeting_room_rounded,
               label: 'Kelas',
-              value: '12',
+              value: _data != null ? '${_data!.jumlahRuangKelas}' : '12',
             ),
           ],
         ),
@@ -386,7 +450,8 @@ class _HeaderIconBtn extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _ProfilTab extends StatelessWidget {
-  const _ProfilTab();
+  final _SekolahData? data;
+  const _ProfilTab({this.data});
 
   @override
   Widget build(BuildContext context) {
@@ -401,7 +466,7 @@ class _ProfilTab extends StatelessWidget {
             _InfoRow(
               icon: Icons.person_rounded,
               label: 'Kepala Sekolah',
-              value: 'Drs. Haji Ahmad',
+              value: data?.kepalaSekolah ?? 'Drs. Haji Ahmad',
             ),
             const _Divider(),
             _InfoRow(
@@ -489,7 +554,7 @@ class _ProfilTab extends StatelessWidget {
                 ),
                 child: Center(
                   child: Text(
-                    'A',
+                    data?.akreditasi ?? 'A',
                     style: GoogleFonts.plusJakartaSans(
                       fontSize: 28,
                       fontWeight: FontWeight.bold,
@@ -504,7 +569,7 @@ class _ProfilTab extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Terakreditasi A',
+                      'Terakreditasi ${data?.akreditasi ?? 'A'}',
                       style: GoogleFonts.plusJakartaSans(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
@@ -540,7 +605,8 @@ class _ProfilTab extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _VisiMisiTab extends StatelessWidget {
-  const _VisiMisiTab();
+  final _SekolahData? data;
+  const _VisiMisiTab({this.data});
 
   @override
   Widget build(BuildContext context) {
@@ -591,7 +657,9 @@ class _VisiMisiTab extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               Text(
-                '"Mewujudkan generasi yang berakhlak mulia, cerdas, terampil, dan peduli lingkungan berdasarkan iman dan taqwa."',
+                data?.visi.isNotEmpty == true
+                    ? '"${data!.visi}"'
+                    : '"Mewujudkan generasi yang berakhlak mulia, cerdas, terampil, dan peduli lingkungan berdasarkan iman dan taqwa."',
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: 14,
                   fontStyle: FontStyle.italic,
@@ -646,7 +714,7 @@ class _VisiMisiTab extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 16),
-              ..._misiList.asMap().entries.map((e) {
+              ...(data?.misiList.isNotEmpty == true ? data!.misiList : _misiList).asMap().entries.map((e) {
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 12),
                   child: Row(
@@ -732,7 +800,8 @@ class _VisiMisiTab extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _SejarahTab extends StatelessWidget {
-  const _SejarahTab();
+  final _SekolahData? data;
+  const _SejarahTab({this.data});
 
   @override
   Widget build(BuildContext context) {
@@ -755,7 +824,9 @@ class _SejarahTab extends StatelessWidget {
             ],
           ),
           child: Text(
-            'SD Negeri Warialau didirikan pada tahun 1985 sebagai respons atas kebutuhan pendidikan dasar bagi warga sekitar. Awalnya hanya memiliki 3 ruang kelas sederhana dengan fasilitas yang sangat terbatas.\n\nSeiring berjalannya waktu, sekolah ini terus berkembang pesat dalam aspek infrastruktur dan prestasi akademik maupun non-akademik di tingkat provinsi. Dukungan penuh dari pemerintah daerah dan masyarakat setempat menjadi pendorong utama kemajuan sekolah.\n\nHingga saat ini, SD Negeri Warialau telah memiliki 12 ruang kelas yang representatif, laboratorium komputer, perpustakaan, dan berbagai fasilitas penunjang lainnya untuk mendukung proses pembelajaran yang berkualitas.',
+            data?.sejarah.isNotEmpty == true
+                ? data!.sejarah
+                : 'SD Negeri Warialau didirikan pada tahun 1985 sebagai respons atas kebutuhan pendidikan dasar bagi warga sekitar. Awalnya hanya memiliki 3 ruang kelas sederhana dengan fasilitas yang sangat terbatas.\n\nSeiring berjalannya waktu, sekolah ini terus berkembang pesat dalam aspek infrastruktur dan prestasi akademik maupun non-akademik di tingkat provinsi. Dukungan penuh dari pemerintah daerah dan masyarakat setempat menjadi pendorong utama kemajuan sekolah.\n\nHingga saat ini, SD Negeri Warialau telah memiliki 12 ruang kelas yang representatif, laboratorium komputer, perpustakaan, dan berbagai fasilitas penunjang lainnya untuk mendukung proses pembelajaran yang berkualitas.',
             style: GoogleFonts.plusJakartaSans(
               fontSize: 14,
               height: 1.8,
@@ -879,7 +950,8 @@ class _MilestoneItem extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _KontakTab extends StatelessWidget {
-  const _KontakTab();
+  final _SekolahData? data;
+  const _KontakTab({this.data});
 
   @override
   Widget build(BuildContext context) {
@@ -894,14 +966,14 @@ class _KontakTab extends StatelessWidget {
               icon: Icons.location_on_rounded,
               iconColor: AppColors.danger,
               label: 'Alamat',
-              value: 'Jl. Pendidikan No. 45, Warialau, Kab. Kepulauan Aru, Maluku',
+              value: data?.alamat.isNotEmpty == true ? data!.alamat : 'Jl. Pendidikan No. 45, Warialau, Kab. Kepulauan Aru, Maluku',
             ),
             const _Divider(),
             _ContactRow(
               icon: Icons.call_rounded,
               iconColor: AppColors.success,
               label: 'Telepon',
-              value: '(0911) 123456',
+              value: data?.kontak.isNotEmpty == true ? data!.kontak : '(0911) 123456',
             ),
             const _Divider(),
             _ContactRow(
