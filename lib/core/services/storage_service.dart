@@ -18,6 +18,11 @@ class StorageService {
     await prefs.remove(_tokenKey);
   }
 
+  static Future<bool> isLoggedIn() async {
+    final token = await getToken();
+    return token != null && token.isNotEmpty;
+  }
+
   static Future<void> clearAll() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.clear();

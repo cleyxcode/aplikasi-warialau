@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:lottie/lottie.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/models/user_model.dart';
 import '../../core/services/api_service.dart';
@@ -172,8 +173,27 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
             onPressed: () => Navigator.pop(context),
           ),
         ),
-        body: const Center(
-          child: CircularProgressIndicator(color: AppColors.gold),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Lottie.asset(
+                'lib/animations/loading _school.json',
+                width: 200,
+                height: 200,
+                repeat: true,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Memuat Profil...',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ],
+          ),
         ),
       );
     }

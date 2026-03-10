@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:lottie/lottie.dart';
 import '../../core/constants/app_colors.dart';
 import '../home/home_screen.dart';
 import '../berita/berita_screen.dart';
@@ -17,6 +19,9 @@ class _MainNavigationState extends State<MainNavigation>
     with SingleTickerProviderStateMixin {
   int _currentIndex = 0;
   late PageController _pageCtrl;
+  bool _isRefreshing = false;
+  // Key unik per tab → ganti key = rebuild widget dari awal
+  List<UniqueKey> _pageKeys = List.generate(5, (_) => UniqueKey());
 
   static const _tabs = [
     _TabItem(icon: Icons.home_outlined, activeIcon: Icons.home_rounded),
@@ -51,10 +56,42 @@ class _MainNavigationState extends State<MainNavigation>
   }
 
   void _onTabTap(int index) {
-    if (index == _currentIndex) return;
+    if (index == _currentIndex) {
+      // Double-tap pada tab aktif → refresh halaman
+      _refreshCurrentPage();
+      return;
+    }
     setState(() => _currentIndex = index);
-    // Gunakan jumpToPage agar tidak ada bug animasi PageView
     _pageCtrl.jumpToPage(index);
+  }
+
+  Future<void> _refreshCurrentPage() async {
+    if (_isRefreshing) return;
+    setState(() => _isRefreshing = true);
+    await Future.delayed(const Duration(milliseconds: 1500));
+    if (!mounted) return;
+    setState(() {
+      // Ganti key untuk tab saat ini → widget direbuild dari awal
+      _pageKeys[_currentIndex] = UniqueKey();
+      _isRefreshing = false;
+    });
+  }
+
+  Widget _buildPage(int index) {
+    switch (index) {
+      case 0:
+        return HomeScreen(key: _pageKeys[0], onTabSwitch: _onTabTap);
+      case 1:
+        return BeritaScreen(key: _pageKeys[1]);
+      case 2:
+        return GaleriScreen(key: _pageKeys[2]);
+      case 3:
+        return PendaftaranScreen(key: _pageKeys[3]);
+      case 4:
+        return ProfilSekolahScreen(key: _pageKeys[4]);
+      default:
+        return HomeScreen(key: _pageKeys[0], onTabSwitch: _onTabTap);
+    }
   }
 
   @override
@@ -64,16 +101,41 @@ class _MainNavigationState extends State<MainNavigation>
     return Scaffold(
       backgroundColor: AppColors.backgroundLight,
       extendBody: true,
-      body: PageView(
-        controller: _pageCtrl,
-        physics: const NeverScrollableScrollPhysics(),
-        onPageChanged: (i) => setState(() => _currentIndex = i),
+      body: Stack(
         children: [
-          _KeepAlivePage(child: HomeScreen(onTabSwitch: _onTabTap)),
-          const _KeepAlivePage(child: BeritaScreen()),
-          const _KeepAlivePage(child: GaleriScreen()),
-          const _KeepAlivePage(child: PendaftaranScreen()),
-          const _KeepAlivePage(child: ProfilSekolahScreen()),
+          PageView(
+            controller: _pageCtrl,
+            physics: const NeverScrollableScrollPhysics(),
+            onPageChanged: (i) => setState(() => _currentIndex = i),
+            children: List.generate(5, (i) => _KeepAlivePage(child: _buildPage(i))),
+          ),
+          // ── Loading overlay saat refresh ──
+          if (_isRefreshing)
+            Container(
+              color: const Color(0xFF0C1E36).withValues(alpha: 0.85),
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Lottie.asset(
+                      'lib/animations/loading _school.json',
+                      width: 200,
+                      height: 200,
+                      repeat: true,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Memuat ulang...',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white.withValues(alpha: 0.8),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
         ],
       ),
       bottomNavigationBar: _FloatingNavBar(

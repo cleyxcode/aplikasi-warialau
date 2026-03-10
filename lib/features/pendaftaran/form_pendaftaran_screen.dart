@@ -19,7 +19,6 @@ class _FormPendaftaranScreenState extends State<FormPendaftaranScreen> {
   int _step = 0;
   bool _agreed = false;
   bool _isSubmitting = false;
-  bool _showSuccess = false;
   late PageController _pageCtrl;
 
   // Step 1 controllers
@@ -141,10 +140,8 @@ class _FormPendaftaranScreenState extends State<FormPendaftaranScreen> {
         'no_hp': _noHpCtrl.text.trim(),
       });
       if (!mounted) return;
-      setState(() {
-        _isSubmitting = false;
-        _showSuccess = true;
-      });
+      setState(() => _isSubmitting = false);
+      _showSuccessDialog();
     } on DioException catch (e) {
       if (!mounted) return;
       setState(() => _isSubmitting = false);
@@ -154,13 +151,98 @@ class _FormPendaftaranScreenState extends State<FormPendaftaranScreen> {
         content: Text(msg, style: GoogleFonts.plusJakartaSans(fontSize: 13)),
         backgroundColor: AppColors.danger,
       ));
-      return;
     }
-    await Future.delayed(const Duration(milliseconds: 3200));
-    if (!mounted) return;
-    Navigator.pushReplacement(
-      context,
-      AppRoute(page: const RiwayatPendaftaranScreen()),
+  }
+
+  void _showSuccessDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 28),
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(24, 28, 24, 24),
+          decoration: BoxDecoration(
+            color: AppColors.white,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.primary.withValues(alpha: 0.2),
+                blurRadius: 30,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Lottie.asset(
+                'lib/animations/listberhasil.json',
+                width: 180,
+                height: 180,
+                repeat: false,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Pendaftaran Berhasil!',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.primary,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Data Anda sedang ditinjau oleh\ntim sekolah.',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 13,
+                  color: AppColors.textSecondary,
+                  height: 1.5,
+                ),
+              ),
+              const SizedBox(height: 24),
+              GestureDetector(
+                onTap: () {
+                  Navigator.pop(context); // tutup dialog
+                  Navigator.pushReplacement(
+                    context,
+                    AppRoute(page: const RiwayatPendaftaranScreen()),
+                  );
+                },
+                child: Container(
+                  width: double.infinity,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [AppColors.primary, Color(0xFF2D5A9B)],
+                    ),
+                    borderRadius: BorderRadius.circular(14),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.primary.withValues(alpha: 0.3),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Center(
+                    child: Text(
+                      'Lihat Riwayat Pendaftaran',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.white,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -278,42 +360,6 @@ class _FormPendaftaranScreenState extends State<FormPendaftaranScreen> {
   @override
   Widget build(BuildContext context) {
     final bottomPad = MediaQuery.of(context).padding.bottom;
-
-    if (_showSuccess) {
-      return Scaffold(
-        backgroundColor: const Color(0xFF0C1E36),
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Lottie.asset(
-                'lib/animations/listberhasil.json',
-                width: 280,
-                height: 280,
-                repeat: false,
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'Pendaftaran Berhasil!',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-              ),
-              const SizedBox(height: 10),
-              Text(
-                'Data Anda sedang ditinjau oleh tim sekolah.',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 14,
-                  color: Colors.white.withValues(alpha: 0.65),
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
 
     return Scaffold(
       backgroundColor: AppColors.backgroundLight,

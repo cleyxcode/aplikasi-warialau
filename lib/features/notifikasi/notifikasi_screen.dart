@@ -12,6 +12,7 @@ class NotifikasiScreen extends StatefulWidget {
 
 class _NotifikasiScreenState extends State<NotifikasiScreen>
     with SingleTickerProviderStateMixin {
+  bool _isLoading = true;
   String _filter = 'Semua';
   late List<_NotifItem> _items;
   late AnimationController _listCtrl;
@@ -23,7 +24,15 @@ class _NotifikasiScreenState extends State<NotifikasiScreen>
     _listCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 600),
-    )..forward();
+    );
+    _simulateLoading();
+  }
+
+  Future<void> _simulateLoading() async {
+    await Future.delayed(const Duration(milliseconds: 1500));
+    if (!mounted) return;
+    setState(() => _isLoading = false);
+    _listCtrl.forward();
   }
 
   @override
@@ -57,6 +66,51 @@ class _NotifikasiScreenState extends State<NotifikasiScreen>
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return Scaffold(
+        backgroundColor: AppColors.backgroundLight,
+        appBar: AppBar(
+          backgroundColor: AppColors.white,
+          surfaceTintColor: Colors.transparent,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_rounded, color: AppColors.primary),
+            onPressed: () => Navigator.pop(context),
+          ),
+          title: Text(
+            'Notifikasi',
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 17,
+              fontWeight: FontWeight.bold,
+              color: AppColors.primary,
+            ),
+          ),
+        ),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Lottie.asset(
+                'lib/animations/loading _school.json',
+                width: 200,
+                height: 200,
+                repeat: true,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Memuat Notifikasi...',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     final filtered = _filtered;
     final today = filtered.where((n) => n.group == 'Hari Ini').toList();
     final yesterday = filtered.where((n) => n.group == 'Kemarin').toList();

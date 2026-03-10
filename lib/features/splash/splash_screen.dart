@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lottie/lottie.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/services/storage_service.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -12,6 +13,8 @@ class SplashScreen extends StatefulWidget {
 
 class _SplashScreenState extends State<SplashScreen>
     with TickerProviderStateMixin {
+  bool _showRocket = false;
+
   late AnimationController _introController;
   late AnimationController _pulseController;
   late AnimationController _progressController;
@@ -90,8 +93,18 @@ class _SplashScreenState extends State<SplashScreen>
 
     _progressController.addStatusListener((s) {
       if (s == AnimationStatus.completed) {
-        Future.delayed(const Duration(milliseconds: 350), () {
-          if (mounted) Navigator.pushReplacementNamed(context, '/onboarding');
+        Future.delayed(const Duration(milliseconds: 350), () async {
+          if (!mounted) return;
+          final loggedIn = await StorageService.isLoggedIn();
+          if (!mounted) return;
+          if (loggedIn) {
+            setState(() => _showRocket = true);
+            await Future.delayed(const Duration(milliseconds: 2800));
+            if (!mounted) return;
+            Navigator.pushReplacementNamed(context, '/home');
+          } else {
+            Navigator.pushReplacementNamed(context, '/onboarding');
+          }
         });
       }
     });
@@ -134,6 +147,42 @@ class _SplashScreenState extends State<SplashScreen>
 
   @override
   Widget build(BuildContext context) {
+    if (_showRocket) {
+      return Scaffold(
+        backgroundColor: const Color(0xFF0C1E36),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Lottie.asset(
+                'lib/animations/rocket.json',
+                width: 260,
+                height: 260,
+                repeat: false,
+              ),
+              const SizedBox(height: 20),
+              Text(
+                'Selamat Datang Kembali!',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Memuat halaman utama...',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 14,
+                  color: Colors.white.withValues(alpha: 0.65),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFF111F35),
       body: Stack(

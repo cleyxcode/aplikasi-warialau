@@ -3,8 +3,10 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:lottie/lottie.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/services/api_service.dart';
+import '../../features/auth/reset_password_screen.dart'; // Just in case, though names are used
 
 class OtpScreen extends StatefulWidget {
   const OtpScreen({super.key});
@@ -17,8 +19,10 @@ class _OtpScreenState extends State<OtpScreen> with TickerProviderStateMixin {
   static const int _len = 6;
   static const int _maxSeconds = 150;
 
-  final List<TextEditingController> _ctrls =
-      List.generate(_len, (_) => TextEditingController());
+  final List<TextEditingController> _ctrls = List.generate(
+    _len,
+    (_) => TextEditingController(),
+  );
   final List<FocusNode> _nodes = List.generate(_len, (_) => FocusNode());
 
   // Staggered box entrance
@@ -51,7 +55,9 @@ class _OtpScreenState extends State<OtpScreen> with TickerProviderStateMixin {
 
     // Header
     _headerCtrl = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 600));
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    );
     _headerSlide = Tween<Offset>(
       begin: const Offset(0, -0.2),
       end: Offset.zero,
@@ -61,14 +67,17 @@ class _OtpScreenState extends State<OtpScreen> with TickerProviderStateMixin {
 
     // Staggered OTP boxes (each box delayed by 60ms)
     _boxCtrl = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 700));
+      vsync: this,
+      duration: const Duration(milliseconds: 700),
+    );
     _boxFades = List.generate(_len, (i) {
       final start = i * 0.12;
       final end = (start + 0.4).clamp(0.0, 1.0);
       return Tween<double>(begin: 0, end: 1).animate(
         CurvedAnimation(
-            parent: _boxCtrl,
-            curve: Interval(start, end, curve: Curves.easeOut)),
+          parent: _boxCtrl,
+          curve: Interval(start, end, curve: Curves.easeOut),
+        ),
       );
     });
     _boxSlides = List.generate(_len, (i) {
@@ -77,16 +86,20 @@ class _OtpScreenState extends State<OtpScreen> with TickerProviderStateMixin {
       return Tween<Offset>(
         begin: const Offset(0, 0.5),
         end: Offset.zero,
-      ).animate(CurvedAnimation(
+      ).animate(
+        CurvedAnimation(
           parent: _boxCtrl,
-          curve: Interval(start, end, curve: Curves.easeOut)));
+          curve: Interval(start, end, curve: Curves.easeOut),
+        ),
+      );
     });
-    Future.delayed(
-        const Duration(milliseconds: 200), () => _boxCtrl.forward());
+    Future.delayed(const Duration(milliseconds: 200), () => _boxCtrl.forward());
 
     // Shake
     _shakeCtrl = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 400));
+      vsync: this,
+      duration: const Duration(milliseconds: 400),
+    );
     _shakeX = TweenSequence<double>([
       TweenSequenceItem(tween: Tween(begin: 0.0, end: -10.0), weight: 1),
       TweenSequenceItem(tween: Tween(begin: -10.0, end: 10.0), weight: 2),
@@ -97,10 +110,13 @@ class _OtpScreenState extends State<OtpScreen> with TickerProviderStateMixin {
 
     // Floating decor
     _floatCtrl = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 2600))
-      ..repeat(reverse: true);
-    _floatY = Tween<double>(begin: -7, end: 7).animate(
-        CurvedAnimation(parent: _floatCtrl, curve: Curves.easeInOut));
+      vsync: this,
+      duration: const Duration(milliseconds: 2600),
+    )..repeat(reverse: true);
+    _floatY = Tween<double>(
+      begin: -7,
+      end: 7,
+    ).animate(CurvedAnimation(parent: _floatCtrl, curve: Curves.easeInOut));
 
     _startTimer();
   }
@@ -156,12 +172,15 @@ class _OtpScreenState extends State<OtpScreen> with TickerProviderStateMixin {
       _shakeCtrl.forward(from: 0);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Masukkan 6 digit kode OTP',
-              style: GoogleFonts.plusJakartaSans()),
+          content: Text(
+            'Masukkan 6 digit kode OTP',
+            style: GoogleFonts.plusJakartaSans(),
+          ),
           backgroundColor: AppColors.danger,
           behavior: SnackBarBehavior.floating,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
         ),
       );
       return;
@@ -177,44 +196,126 @@ class _OtpScreenState extends State<OtpScreen> with TickerProviderStateMixin {
       final resetEmail = response.data['reset_email'] as String? ?? _email;
       if (!mounted) return;
       setState(() => _isLoading = false);
-      navigator.pushReplacementNamed('/reset-password',
-          arguments: resetEmail);
+
+      _showResultDialog(true);
+      await Future.delayed(const Duration(milliseconds: 2200));
+      if (!mounted) return;
+      Navigator.pop(context); // Close dialog
+      Navigator.pushReplacementNamed(
+        context,
+        '/reset-password',
+        arguments: resetEmail,
+      );
     } on DioException catch (e) {
       if (!mounted) return;
       setState(() => _isLoading = false);
       _shakeCtrl.forward(from: 0);
       final msg = e.response?.data['message'] ?? 'Kode OTP tidak valid.';
-      messenger.showSnackBar(SnackBar(
-        content: Text(msg, style: GoogleFonts.plusJakartaSans()),
-        backgroundColor: AppColors.danger,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ));
+      _showResultDialog(false, msg);
     }
+  }
+
+  void _showResultDialog(bool success, [String? message]) {
+    showDialog(
+      context: context,
+      barrierDismissible: !success,
+      builder: (_) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: AppColors.white,
+            borderRadius: BorderRadius.circular(24),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Lottie.asset(
+                success
+                    ? 'lib/animations/success.json'
+                    : 'lib/animations/Fail.json',
+                width: 150,
+                height: 150,
+                repeat: false,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                success ? 'Verifikasi Berhasil' : 'Verifikasi Gagal',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: success ? AppColors.success : AppColors.danger,
+                ),
+              ),
+              if (message != null) ...[
+                const SizedBox(height: 8),
+                Text(
+                  message,
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 14,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
+              if (!success) ...[
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.danger,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Text('Coba Lagi'),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _resend() async {
     if (_email.isEmpty) return;
     final messenger = ScaffoldMessenger.of(context);
     try {
-      await ApiService.instance
-          .post('/auth/forgot-password', data: {'email': _email});
+      await ApiService.instance.post(
+        '/auth/forgot-password',
+        data: {'email': _email},
+      );
       _startTimer();
-      messenger.showSnackBar(SnackBar(
-        content: Text('Kode OTP baru telah dikirim.',
-            style: GoogleFonts.plusJakartaSans()),
-        backgroundColor: AppColors.success,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ));
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            'Kode OTP baru telah dikirim.',
+            style: GoogleFonts.plusJakartaSans(),
+          ),
+          backgroundColor: AppColors.success,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+      );
     } on DioException catch (e) {
       final msg = e.response?.data['message'] ?? 'Gagal mengirim ulang OTP.';
-      messenger.showSnackBar(SnackBar(
-        content: Text(msg, style: GoogleFonts.plusJakartaSans()),
-        backgroundColor: AppColors.danger,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ));
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(msg, style: GoogleFonts.plusJakartaSans()),
+          backgroundColor: AppColors.danger,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+      );
     }
   }
 
@@ -225,8 +326,12 @@ class _OtpScreenState extends State<OtpScreen> with TickerProviderStateMixin {
     _boxCtrl.dispose();
     _shakeCtrl.dispose();
     _floatCtrl.dispose();
-    for (final c in _ctrls) { c.dispose(); }
-    for (final n in _nodes) { n.dispose(); }
+    for (final c in _ctrls) {
+      c.dispose();
+    }
+    for (final n in _nodes) {
+      n.dispose();
+    }
     super.dispose();
   }
 
@@ -282,7 +387,9 @@ class _OtpScreenState extends State<OtpScreen> with TickerProviderStateMixin {
 
                       Padding(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 20, vertical: 8),
+                          horizontal: 20,
+                          vertical: 8,
+                        ),
                         child: Column(
                           children: [
                             // Top bar
@@ -295,12 +402,15 @@ class _OtpScreenState extends State<OtpScreen> with TickerProviderStateMixin {
                                     height: 40,
                                     decoration: BoxDecoration(
                                       shape: BoxShape.circle,
-                                      color: Colors.white.withValues(alpha: 0.12),
+                                      color: Colors.white.withValues(
+                                        alpha: 0.12,
+                                      ),
                                     ),
                                     child: const Icon(
-                                        Icons.arrow_back_rounded,
-                                        color: Colors.white,
-                                        size: 20),
+                                      Icons.arrow_back_rounded,
+                                      color: Colors.white,
+                                      size: 20,
+                                    ),
                                   ),
                                 ),
                                 Expanded(
@@ -309,7 +419,9 @@ class _OtpScreenState extends State<OtpScreen> with TickerProviderStateMixin {
                                       'SD Negeri Warialau',
                                       style: GoogleFonts.plusJakartaSans(
                                         fontSize: 14,
-                                        color: Colors.white.withValues(alpha: 0.75),
+                                        color: Colors.white.withValues(
+                                          alpha: 0.75,
+                                        ),
                                         fontWeight: FontWeight.w500,
                                       ),
                                     ),
@@ -332,14 +444,16 @@ class _OtpScreenState extends State<OtpScreen> with TickerProviderStateMixin {
                                       color: AppColors.white,
                                       boxShadow: [
                                         BoxShadow(
-                                          color: Colors.black
-                                              .withValues(alpha: 0.2),
+                                          color: Colors.black.withValues(
+                                            alpha: 0.2,
+                                          ),
                                           blurRadius: 20,
                                           offset: const Offset(0, 6),
                                         ),
                                         BoxShadow(
-                                          color: AppColors.gold
-                                              .withValues(alpha: 0.15),
+                                          color: AppColors.gold.withValues(
+                                            alpha: 0.15,
+                                          ),
                                           blurRadius: 30,
                                           spreadRadius: 2,
                                         ),
@@ -363,13 +477,18 @@ class _OtpScreenState extends State<OtpScreen> with TickerProviderStateMixin {
                                   const SizedBox(height: 8),
                                   Container(
                                     padding: const EdgeInsets.symmetric(
-                                        horizontal: 14, vertical: 5),
+                                      horizontal: 14,
+                                      vertical: 5,
+                                    ),
                                     decoration: BoxDecoration(
-                                      color: Colors.white.withValues(alpha: 0.1),
+                                      color: Colors.white.withValues(
+                                        alpha: 0.1,
+                                      ),
                                       borderRadius: BorderRadius.circular(999),
                                       border: Border.all(
-                                        color: AppColors.gold
-                                            .withValues(alpha: 0.4),
+                                        color: AppColors.gold.withValues(
+                                          alpha: 0.4,
+                                        ),
                                       ),
                                     ),
                                     child: Text(
@@ -446,8 +565,9 @@ class _OtpScreenState extends State<OtpScreen> with TickerProviderStateMixin {
                               child: Container(
                                 width: 46,
                                 height: 54,
-                                margin:
-                                    EdgeInsets.only(right: i < _len - 1 ? 8 : 0),
+                                margin: EdgeInsets.only(
+                                  right: i < _len - 1 ? 8 : 0,
+                                ),
                                 child: TextFormField(
                                   controller: _ctrls[i],
                                   focusNode: _nodes[i],
@@ -489,7 +609,9 @@ class _OtpScreenState extends State<OtpScreen> with TickerProviderStateMixin {
                                     focusedBorder: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(12),
                                       borderSide: const BorderSide(
-                                          color: AppColors.gold, width: 2),
+                                        color: AppColors.gold,
+                                        width: 2,
+                                      ),
                                     ),
                                     contentPadding: EdgeInsets.zero,
                                   ),
@@ -511,8 +633,11 @@ class _OtpScreenState extends State<OtpScreen> with TickerProviderStateMixin {
                               key: const ValueKey('timer'),
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                const Icon(Icons.timer_outlined,
-                                    color: AppColors.gold, size: 18),
+                                const Icon(
+                                  Icons.timer_outlined,
+                                  color: AppColors.gold,
+                                  size: 18,
+                                ),
                                 const SizedBox(width: 6),
                                 Text(
                                   'Kode berlaku selama $_timerText',
@@ -536,7 +661,9 @@ class _OtpScreenState extends State<OtpScreen> with TickerProviderStateMixin {
                         Text(
                           'Belum menerima kode? ',
                           style: GoogleFonts.plusJakartaSans(
-                              fontSize: 13, color: AppColors.textSecondary),
+                            fontSize: 13,
+                            color: AppColors.textSecondary,
+                          ),
                         ),
                         GestureDetector(
                           onTap: _canResend ? _resend : null,
@@ -564,10 +691,9 @@ class _OtpScreenState extends State<OtpScreen> with TickerProviderStateMixin {
                         width: double.infinity,
                         height: 52,
                         decoration: BoxDecoration(
-                          gradient: const LinearGradient(colors: [
-                            Color(0xFF1F3B61),
-                            Color(0xFF2D5A9B),
-                          ]),
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFF1F3B61), Color(0xFF2D5A9B)],
+                          ),
                           borderRadius: BorderRadius.circular(999),
                           boxShadow: [
                             BoxShadow(
@@ -605,8 +731,11 @@ class _OtpScreenState extends State<OtpScreen> with TickerProviderStateMixin {
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Icon(Icons.info_outline_rounded,
-                            size: 16, color: AppColors.textLight),
+                        const Icon(
+                          Icons.info_outline_rounded,
+                          size: 16,
+                          color: AppColors.textLight,
+                        ),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
@@ -650,9 +779,13 @@ class _PressBtnState extends State<_PressBtn>
   void initState() {
     super.initState();
     _c = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 100));
-    _s = Tween<double>(begin: 1.0, end: 0.96)
-        .animate(CurvedAnimation(parent: _c, curve: Curves.easeOut));
+      vsync: this,
+      duration: const Duration(milliseconds: 100),
+    );
+    _s = Tween<double>(
+      begin: 1.0,
+      end: 0.96,
+    ).animate(CurvedAnimation(parent: _c, curve: Curves.easeOut));
   }
 
   @override
