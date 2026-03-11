@@ -125,26 +125,95 @@ class _LoginScreenState extends State<LoginScreen>
     } on DioException catch (e) {
       if (!mounted) return;
       setState(() => _isLoading = false);
-      final msg =
-          e.response?.data['message'] as String? ??
-          'Login gagal. Periksa koneksi Anda.';
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            msg,
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 13,
-              color: AppColors.white,
-            ),
+
+      bool isConnectionError = e.type == DioExceptionType.connectionTimeout ||
+          e.type == DioExceptionType.sendTimeout ||
+          e.type == DioExceptionType.receiveTimeout ||
+          e.type == DioExceptionType.connectionError;
+
+      if (isConnectionError) {
+        _showErrorDialog(
+          'Koneksi Terputus',
+          'Gagal terhubung ke server. Periksa koneksi internet Anda.',
+          'lib/animations/404.json',
+        );
+      } else {
+        final msg = e.response?.data['message'] as String? ?? 'Login gagal. Periksa kembali email dan kata sandi Anda.';
+        _showErrorDialog(
+          'Login Gagal',
+          msg,
+          'lib/animations/Fail.json',
+        );
+      }
+    }
+  }
+
+  void _showErrorDialog(String title, String message, String animationPath) {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (_) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: AppColors.white,
+            borderRadius: BorderRadius.circular(24),
           ),
-          backgroundColor: AppColors.danger,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Lottie.asset(
+                animationPath,
+                width: 150,
+                height: 150,
+                repeat: false,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                title,
+                textAlign: TextAlign.center,
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.danger,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                message,
+                textAlign: TextAlign.center,
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 14,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.danger,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                  child: Text(
+                    'Coba Lagi',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
-      );
-    }
+      ),
+    );
   }
 
   @override
@@ -192,7 +261,7 @@ class _LoginScreenState extends State<LoginScreen>
         children: [
           // ── Header (48%) ──
           Expanded(
-            flex: 52,
+            flex: 40,
             child: SafeArea(
               bottom: false,
               child: Stack(
@@ -204,8 +273,8 @@ class _LoginScreenState extends State<LoginScreen>
                     children: [
                       Lottie.asset(
                         'lib/animations/login.json',
-                        width: 270,
-                        height: 270,
+                        width: 200,
+                        height: 200,
                         fit: BoxFit.contain,
                         animate: true,
                         repeat: true,
@@ -215,7 +284,7 @@ class _LoginScreenState extends State<LoginScreen>
                           color: Colors.white,
                         ),
                       ),
-                      const SizedBox(height: 10),
+                      const SizedBox(height: 12),
                       Text(
                         'SD Negeri Warialau',
                         style: GoogleFonts.plusJakartaSans(
@@ -253,7 +322,7 @@ class _LoginScreenState extends State<LoginScreen>
 
           // ── Form card (48%) ──
           Expanded(
-            flex: 48,
+            flex: 60,
             child: Container(
               width: double.infinity,
               decoration: const BoxDecoration(
@@ -268,7 +337,7 @@ class _LoginScreenState extends State<LoginScreen>
                 ],
               ),
               child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(28, 32, 28, 28),
+                padding: const EdgeInsets.fromLTRB(28, 20, 28, 20),
                 child: Form(
                   key: _formKey,
                   child: Column(
@@ -290,7 +359,7 @@ class _LoginScreenState extends State<LoginScreen>
                           color: AppColors.textSecondary,
                         ),
                       ),
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 16),
 
                       // Email field
                       SlideTransition(
@@ -324,7 +393,7 @@ class _LoginScreenState extends State<LoginScreen>
                         ),
                       ),
 
-                      const SizedBox(height: 18),
+                      const SizedBox(height: 12),
 
                       // Password field
                       SlideTransition(
@@ -389,7 +458,7 @@ class _LoginScreenState extends State<LoginScreen>
                         ),
                       ),
 
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 12),
 
                       // Button + footer
                       SlideTransition(
@@ -443,7 +512,7 @@ class _LoginScreenState extends State<LoginScreen>
                                 ),
                               ),
 
-                              const SizedBox(height: 24),
+                              const SizedBox(height: 16),
 
                               Row(
                                 children: [
@@ -468,7 +537,7 @@ class _LoginScreenState extends State<LoginScreen>
                                 ],
                               ),
 
-                              const SizedBox(height: 18),
+                              const SizedBox(height: 12),
 
                               GestureDetector(
                                 onTap: () =>
@@ -495,14 +564,6 @@ class _LoginScreenState extends State<LoginScreen>
 
                               const SizedBox(height: 6),
 
-                              Text(
-                                'Khusus Orang Tua / Wali Murid',
-                                style: GoogleFonts.plusJakartaSans(
-                                  fontSize: 12,
-                                  fontStyle: FontStyle.italic,
-                                  color: AppColors.textLight,
-                                ),
-                              ),
                             ],
                           ),
                         ),

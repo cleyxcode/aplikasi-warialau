@@ -18,21 +18,25 @@ class _SplashScreenState extends State<SplashScreen>
   late AnimationController _introController;
   late AnimationController _pulseController;
   late AnimationController _progressController;
+  late AnimationController _floatController;
 
   late Animation<double> _logoScale;
   late Animation<double> _logoFade;
   late Animation<double> _textFade;
   late Animation<Offset> _textSlide;
   late Animation<double> _progress;
+  late Animation<double> _bottomFade;
+  late Animation<Offset> _bottomSlide;
+  late Animation<double> _floatOffset;
 
   @override
   void initState() {
     super.initState();
 
-    // ── Intro: logo bounce → text slide ──
+    // ── Intro: logo bounce → text slide → bottom fade ──
     _introController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 800),
+      duration: const Duration(milliseconds: 1200),
     );
 
     _logoScale =
@@ -42,21 +46,21 @@ class _SplashScreenState extends State<SplashScreen>
         ]).animate(
           CurvedAnimation(
             parent: _introController,
-            curve: const Interval(0.0, 0.75, curve: Curves.easeOut),
+            curve: const Interval(0.0, 0.5, curve: Curves.easeOut),
           ),
         );
 
     _logoFade = Tween<double>(begin: 0, end: 1).animate(
       CurvedAnimation(
         parent: _introController,
-        curve: const Interval(0.0, 0.4),
+        curve: const Interval(0.0, 0.3),
       ),
     );
 
     _textFade = Tween<double>(begin: 0, end: 1).animate(
       CurvedAnimation(
         parent: _introController,
-        curve: const Interval(0.55, 1.0),
+        curve: const Interval(0.35, 0.65),
       ),
     );
 
@@ -64,7 +68,22 @@ class _SplashScreenState extends State<SplashScreen>
         .animate(
           CurvedAnimation(
             parent: _introController,
-            curve: const Interval(0.55, 1.0, curve: Curves.easeOut),
+            curve: const Interval(0.35, 0.65, curve: Curves.easeOut),
+          ),
+        );
+
+    _bottomFade = Tween<double>(begin: 0, end: 1).animate(
+      CurvedAnimation(
+        parent: _introController,
+        curve: const Interval(0.65, 1.0),
+      ),
+    );
+
+    _bottomSlide =
+        Tween<Offset>(begin: const Offset(0, 0.5), end: Offset.zero).animate(
+          CurvedAnimation(
+            parent: _introController,
+            curve: const Interval(0.65, 1.0, curve: Curves.easeOut),
           ),
         );
 
@@ -72,6 +91,16 @@ class _SplashScreenState extends State<SplashScreen>
     _pulseController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 2200),
+    );
+
+    // ── Floating bob effect ──
+    _floatController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2000),
+    );
+
+    _floatOffset = Tween<double>(begin: -6, end: 6).animate(
+      CurvedAnimation(parent: _floatController, curve: Curves.easeInOut),
     );
 
     // ── Progress ──
@@ -88,6 +117,7 @@ class _SplashScreenState extends State<SplashScreen>
     // ── Sequence ──
     _introController.forward().then((_) {
       _pulseController.repeat();
+      _floatController.repeat(reverse: true);
       _progressController.forward();
     });
 
@@ -115,6 +145,7 @@ class _SplashScreenState extends State<SplashScreen>
     _introController.dispose();
     _pulseController.dispose();
     _progressController.dispose();
+    _floatController.dispose();
     super.dispose();
   }
 
@@ -236,61 +267,69 @@ class _SplashScreenState extends State<SplashScreen>
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // Pulse rings + logo
-                SizedBox(
-                  width: 200,
-                  height: 200,
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      _pulseRing(0.0, 0.7, 190),
-                      _pulseRing(0.25, 0.9, 160),
-                      _pulseRing(0.5, 1.0, 130),
+                // Floating logo with pulse rings
+                AnimatedBuilder(
+                  animation: _floatOffset,
+                  builder: (_, child) => Transform.translate(
+                    offset: Offset(0, _floatOffset.value),
+                    child: child,
+                  ),
+                  child: SizedBox(
+                    width: 260,
+                    height: 260,
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        _pulseRing(0.0, 0.7, 250),
+                        _pulseRing(0.25, 0.9, 210),
+                        _pulseRing(0.5, 1.0, 170),
 
-                      // Logo circle with Lottie animation
-                      ScaleTransition(
-                        scale: _logoScale,
-                        child: FadeTransition(
-                          opacity: _logoFade,
-                          child: Container(
-                            width: 140,
-                            height: 140,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: AppColors.white,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.3),
-                                  blurRadius: 32,
-                                  offset: const Offset(0, 12),
-                                ),
-                                BoxShadow(
-                                  color: AppColors.gold.withValues(alpha: 0.25),
-                                  blurRadius: 48,
-                                  spreadRadius: 4,
-                                ),
-                              ],
-                            ),
-                            child: ClipOval(
-                              child: Padding(
-                                padding: const EdgeInsets.all(10),
-                                child: Lottie.asset(
-                                  'lib/animations/iconSplash.json',
-                                  fit: BoxFit.contain,
-                                  animate: true,
-                                  repeat: true,
-                                  errorBuilder: (_, __, ___) => const Icon(
-                                    Icons.school_rounded,
-                                    size: 64,
-                                    color: AppColors.primary,
+                        // Logo circle with Lottie animation
+                        ScaleTransition(
+                          scale: _logoScale,
+                          child: FadeTransition(
+                            opacity: _logoFade,
+                            child: Container(
+                              width: 180,
+                              height: 180,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: AppColors.white,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.3),
+                                    blurRadius: 32,
+                                    offset: const Offset(0, 12),
+                                  ),
+                                  BoxShadow(
+                                    color:
+                                        AppColors.gold.withValues(alpha: 0.25),
+                                    blurRadius: 48,
+                                    spreadRadius: 4,
+                                  ),
+                                ],
+                              ),
+                              child: ClipOval(
+                                child: Padding(
+                                  padding: const EdgeInsets.all(12),
+                                  child: Lottie.asset(
+                                    'lib/animations/iconSplash.json',
+                                    fit: BoxFit.contain,
+                                    animate: true,
+                                    repeat: true,
+                                    errorBuilder: (_, __, ___) => const Icon(
+                                      Icons.school_rounded,
+                                      size: 80,
+                                      color: AppColors.primary,
+                                    ),
                                   ),
                                 ),
                               ),
                             ),
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
 
@@ -343,100 +382,79 @@ class _SplashScreenState extends State<SplashScreen>
             ),
           ),
 
-          // ── Bottom loading ──
+          // ── Bottom loading (single progress bar only) ──
           Positioned(
             bottom: 52,
             left: 36,
             right: 36,
-            child: AnimatedBuilder(
-              animation: _progress,
-              builder: (_, __) {
-                final pct = (_progress.value * 100).toInt();
-                return Column(
-                  children: [
-                    // Circular progress + percentage
-                    SizedBox(
-                      width: 60,
-                      height: 60,
-                      child: Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          CircularProgressIndicator(
-                            value: 1.0,
-                            strokeWidth: 3,
-                            color: Colors.white.withValues(alpha: 0.08),
-                          ),
-                          CircularProgressIndicator(
-                            value: _progress.value,
-                            strokeWidth: 3,
-                            strokeCap: StrokeCap.round,
-                            valueColor: const AlwaysStoppedAnimation<Color>(
-                              AppColors.gold,
-                            ),
-                          ),
-                          Text(
-                            '$pct%',
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            child: SlideTransition(
+              position: _bottomSlide,
+              child: FadeTransition(
+                opacity: _bottomFade,
+                child: AnimatedBuilder(
+                  animation: _progress,
+                  builder: (_, __) {
+                    final pct = (_progress.value * 100).toInt();
+                    return Column(
                       children: [
-                        Text(
-                          'MEMUAT...',
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white.withValues(alpha: 0.45),
-                            letterSpacing: 2.5,
-                          ),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'MEMUAT...',
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white.withValues(alpha: 0.45),
+                                letterSpacing: 2.5,
+                              ),
+                            ),
+                            Text(
+                              '$pct%',
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.gold.withValues(alpha: 0.8),
+                              ),
+                            ),
+                          ],
                         ),
-                        Text(
-                          '$pct / 100',
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 10,
-                            color: Colors.white.withValues(alpha: 0.35),
+                        const SizedBox(height: 8),
+                        // Glowing progress bar
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(999),
+                          child: Container(
+                            height: 4,
+                            color: Colors.white.withValues(alpha: 0.08),
+                            child: FractionallySizedBox(
+                              alignment: Alignment.centerLeft,
+                              widthFactor: _progress.value,
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  gradient: const LinearGradient(
+                                    colors: [
+                                      AppColors.gold,
+                                      Color(0xFFF5D060),
+                                    ],
+                                  ),
+                                  borderRadius: BorderRadius.circular(999),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color:
+                                          AppColors.gold.withValues(alpha: 0.7),
+                                      blurRadius: 8,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
                           ),
                         ),
                       ],
-                    ),
-                    const SizedBox(height: 6),
-                    // Glowing progress bar
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(999),
-                      child: Container(
-                        height: 4,
-                        color: Colors.white.withValues(alpha: 0.08),
-                        child: FractionallySizedBox(
-                          alignment: Alignment.centerLeft,
-                          widthFactor: _progress.value,
-                          child: Container(
-                            decoration: BoxDecoration(
-                              gradient: const LinearGradient(
-                                colors: [AppColors.gold, Color(0xFFF5D060)],
-                              ),
-                              borderRadius: BorderRadius.circular(999),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: AppColors.gold.withValues(alpha: 0.7),
-                                  blurRadius: 8,
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                );
-              },
+                    );
+                  },
+                ),
+              ),
             ),
           ),
         ],

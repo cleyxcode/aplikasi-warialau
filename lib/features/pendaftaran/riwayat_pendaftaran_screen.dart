@@ -207,15 +207,6 @@ class _RiwayatPendaftaranScreenState extends State<RiwayatPendaftaranScreen>
           ),
         ),
         collapseMode: CollapseMode.pin,
-        title: Text(
-          'Status Pendaftaran',
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            color: AppColors.white,
-          ),
-        ),
-        titlePadding: const EdgeInsets.only(left: 56, bottom: 16),
       ),
     );
   }

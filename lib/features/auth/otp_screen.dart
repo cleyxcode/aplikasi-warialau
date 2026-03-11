@@ -593,7 +593,7 @@ class _OtpScreenState extends State<OtpScreen> with TickerProviderStateMixin {
                                       borderSide: BorderSide(
                                         color: filled
                                             ? AppColors.gold
-                                            : Colors.transparent,
+                                            : AppColors.divider,
                                         width: 2,
                                       ),
                                     ),
@@ -602,7 +602,7 @@ class _OtpScreenState extends State<OtpScreen> with TickerProviderStateMixin {
                                       borderSide: BorderSide(
                                         color: filled
                                             ? AppColors.gold
-                                            : Colors.transparent,
+                                            : AppColors.divider,
                                         width: 2,
                                       ),
                                     ),

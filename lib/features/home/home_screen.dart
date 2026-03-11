@@ -138,7 +138,7 @@ class _HomeScreenState extends State<HomeScreen> {
   String _mapRole(String role) {
     switch (role) {
       case 'orangtua':
-        return 'Orang Tua Murid';
+        return '';
       case 'admin':
         return 'Admin';
       default:
@@ -177,7 +177,7 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildWelcomeCard(),
+                _buildSearchBox(),
                 const SizedBox(height: 16),
                 _buildBannerSlider(),
                 const SizedBox(height: 24),
@@ -212,7 +212,7 @@ class _HomeScreenState extends State<HomeScreen> {
       elevation: 0,
       scrolledUnderElevation: 1,
       shadowColor: AppColors.divider,
-      backgroundColor: AppColors.white,
+      backgroundColor: AppColors.gold,
       surfaceTintColor: Colors.transparent,
       automaticallyImplyLeading: false,
       toolbarHeight: 64,
@@ -234,12 +234,10 @@ class _HomeScreenState extends State<HomeScreen> {
               height: 42,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                gradient: const LinearGradient(
-                  colors: [AppColors.gold, Color(0xFFE8C547)],
-                ),
+                color: AppColors.primary,
                 boxShadow: [
                   BoxShadow(
-                    color: AppColors.gold.withValues(alpha: 0.35),
+                    color: AppColors.primary.withValues(alpha: 0.25),
                     blurRadius: 10,
                     offset: const Offset(0, 3),
                   ),
@@ -253,7 +251,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         style: GoogleFonts.plusJakartaSans(
                           fontSize: 15,
                           fontWeight: FontWeight.bold,
-                          color: AppColors.primary,
+                          color: AppColors.white,
                         ),
                       ),
               ),
@@ -279,14 +277,14 @@ class _HomeScreenState extends State<HomeScreen> {
                           style: GoogleFonts.plusJakartaSans(
                             fontSize: 15,
                             fontWeight: FontWeight.bold,
-                            color: AppColors.textPrimary,
+                            color: AppColors.white,
                           ),
                         ),
                         Text(
                           _userRole,
                           style: GoogleFonts.plusJakartaSans(
                             fontSize: 11,
-                            color: AppColors.textSecondary,
+                            color: AppColors.white.withValues(alpha: 0.8),
                           ),
                         ),
                       ],
@@ -311,12 +309,14 @@ class _HomeScreenState extends State<HomeScreen> {
                   height: 42,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: AppColors.inputBg,
-                    border: Border.all(color: AppColors.divider),
+                    color: AppColors.white.withValues(alpha: 0.15),
+                    border: Border.all(
+                      color: AppColors.white.withValues(alpha: 0.1),
+                    ),
                   ),
                   child: const Icon(
                     Icons.notifications_outlined,
-                    color: AppColors.primary,
+                    color: AppColors.white,
                     size: 22,
                   ),
                 ),
@@ -341,107 +341,63 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // ── Welcome Card ─────────────────────────────────────────
+  // ── Search Box ─────────────────────────────────────────
 
-  Widget _buildWelcomeCard() {
-    if (_isLoadingData) {
-      return Padding(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-        child: _ShimmerWrap(
-          child: Container(
-            width: double.infinity,
-            height: 130,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-            ),
-          ),
-        ),
-      );
-    }
-
-    final displayName = _userName.split(' ').take(2).join(' ');
-
+  Widget _buildSearchBox() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
-          gradient: const LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [AppColors.primary, Color(0xFF254A7A)],
+      child: GestureDetector(
+        onTap: () {
+          // TODO: Navigate to search screen or open search delegate
+        },
+        child: Container(
+          width: double.infinity,
+          height: 52,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          decoration: BoxDecoration(
+            color: AppColors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppColors.divider),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.04),
+                blurRadius: 10,
+                offset: const Offset(0, 2),
+              ),
+            ],
           ),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.primary.withValues(alpha: 0.35),
-              blurRadius: 20,
-              offset: const Offset(0, 8),
-            ),
-          ],
-        ),
-        child: Stack(
-          children: [
-            Positioned(
-              right: -16,
-              bottom: -16,
-              child: Container(
-                width: 100,
-                height: 100,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: AppColors.gold.withValues(alpha: 0.18),
+          child: Row(
+            children: [
+              Icon(
+                Icons.search_rounded,
+                color: AppColors.textLight,
+                size: 22,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Cari informasi sekolah...',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 14,
+                    color: AppColors.textLight,
+                  ),
                 ),
               ),
-            ),
-            Positioned(
-              left: -12,
-              top: -12,
-              child: Container(
-                width: 70,
-                height: 70,
+              Container(
+                width: 32,
+                height: 32,
                 decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.white.withValues(alpha: 0.07),
+                  color: AppColors.primary.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.tune_rounded,
+                  color: AppColors.primary,
+                  size: 18,
                 ),
               ),
-            ),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Selamat Datang,',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.white,
-                    height: 1.3,
-                  ),
-                ),
-                Text(
-                  displayName,
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.gold,
-                    height: 1.3,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Temukan informasi terbaru sekolah kami',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                    color: Colors.white.withValues(alpha: 0.85),
-                    height: 1.5,
-                  ),
-                ),
-              ],
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
