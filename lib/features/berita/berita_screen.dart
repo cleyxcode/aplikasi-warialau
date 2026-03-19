@@ -3,11 +3,10 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:lottie/lottie.dart';
 import 'package:shimmer/shimmer.dart';
-import 'package:dio/dio.dart';
 import '../../core/constants/app_colors.dart';
-import '../../core/services/api_service.dart';
 import '../../core/utils/app_transitions.dart';
 import 'berita_model.dart';
+import 'berita_service.dart';
 import 'detail_berita_screen.dart';
 
 class BeritaScreen extends StatefulWidget {
@@ -64,27 +63,20 @@ class _BeritaScreenState extends State<BeritaScreen>
       setState(() => _isLoadingMore = true);
     }
     try {
-      final resp = await ApiService.instance.get(
-        '/berita',
-        queryParameters: {'per_page': 10, 'page': page},
-      );
-      final data = resp.data as Map<String, dynamic>;
-      final items = (data['data'] as List)
-          .map((e) => BeritaModel.fromJson(e as Map<String, dynamic>))
-          .toList();
+      final result = await BeritaService.getBerita(page: page, perPage: 10);
       setState(() {
         if (page == 1) {
-          _beritaList = items;
+          _beritaList = result.items;
         } else {
-          _beritaList = [..._beritaList, ...items];
+          _beritaList = [..._beritaList, ...result.items];
         }
-        _currentPage = data['current_page'] as int;
-        _lastPage = data['last_page'] as int;
+        _currentPage = result.currentPage;
+        _lastPage = result.lastPage;
         _isLoading = false;
         _isLoadingMore = false;
       });
       if (page == 1) _listAnimCtrl.forward(from: 0);
-    } on DioException {
+    } catch (_) {
       setState(() {
         _isLoading = false;
         _isLoadingMore = false;

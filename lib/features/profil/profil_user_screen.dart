@@ -5,6 +5,7 @@ import '../../core/constants/app_colors.dart';
 import '../../core/models/user_model.dart';
 import '../../core/services/api_service.dart';
 import '../../core/services/storage_service.dart';
+import '../guru/guru_screen.dart';
 
 class ProfilUserScreen extends StatefulWidget {
   const ProfilUserScreen({super.key});
@@ -211,6 +212,8 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
                   _buildProfileHeader(),
                   const SizedBox(height: 20),
                   _buildInfoSection(),
+                  const SizedBox(height: 16),
+                  _buildGuruMenu(),
                   const SizedBox(height: 16),
                   _buildPasswordSection(),
                   const SizedBox(height: 16),
@@ -419,6 +422,66 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
           keyboardType: TextInputType.phone,
         ),
       ],
+    );
+  }
+
+  // ── Guru Menu ────────────────────────────────────────────
+  Widget _buildGuruMenu() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: GestureDetector(
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const GuruScreen()),
+        ),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+          decoration: BoxDecoration(
+            color: AppColors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.05),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: AppColors.primary.withValues(alpha: 0.08),
+                ),
+                child: const Icon(
+                  Icons.groups_rounded,
+                  color: AppColors.primary,
+                  size: 18,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Text(
+                  'Daftar Guru',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ),
+              const Icon(
+                Icons.chevron_right_rounded,
+                color: AppColors.textLight,
+                size: 22,
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 

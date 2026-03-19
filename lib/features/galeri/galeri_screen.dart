@@ -3,11 +3,10 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:lottie/lottie.dart';
 import 'package:shimmer/shimmer.dart';
-import 'package:dio/dio.dart';
 import '../../core/constants/app_colors.dart';
-import '../../core/services/api_service.dart';
 import '../../core/utils/app_transitions.dart';
 import 'galeri_model.dart';
+import 'galeri_service.dart';
 import 'galeri_viewer_screen.dart';
 
 class GaleriScreen extends StatefulWidget {
@@ -27,6 +26,7 @@ class _GaleriScreenState extends State<GaleriScreen>
   int _currentPage = 1;
   int _lastPage = 1;
   bool _isLoadingMore = false;
+  bool _isGridView = true;
 
   @override
   void initState() {
@@ -48,27 +48,20 @@ class _GaleriScreenState extends State<GaleriScreen>
       setState(() => _isLoadingMore = true);
     }
     try {
-      final resp = await ApiService.instance.get(
-        '/galeri',
-        queryParameters: {'per_page': 12, 'page': page},
-      );
-      final data = resp.data as Map<String, dynamic>;
-      final items = (data['data'] as List)
-          .map((e) => GaleriItem.fromJson(e as Map<String, dynamic>))
-          .toList();
+      final result = await GaleriService.getGaleri(page: page, perPage: 12);
       setState(() {
         if (page == 1) {
-          _galeriList = items;
+          _galeriList = result.items;
         } else {
-          _galeriList = [..._galeriList, ...items];
+          _galeriList = [..._galeriList, ...result.items];
         }
-        _currentPage = data['current_page'] as int;
-        _lastPage = data['last_page'] as int;
+        _currentPage = result.currentPage;
+        _lastPage = result.lastPage;
         _isLoading = false;
         _isLoadingMore = false;
       });
       if (page == 1) _gridCtrl.forward(from: 0);
-    } on DioException {
+    } catch (_) {
       setState(() {
         _isLoading = false;
         _isLoadingMore = false;
@@ -142,44 +135,71 @@ class _GaleriScreenState extends State<GaleriScreen>
           _buildAppBar(items.length),
           SliverToBoxAdapter(child: _buildCategories()),
           if (items.isNotEmpty) ...[
-            // Featured first item (full-width)
-            SliverToBoxAdapter(
-              child: _AnimatedGridItem(
-                index: 0,
-                controller: _gridCtrl,
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-                  child: _FeaturedTile(
-                    item: items.first,
-                    onTap: () => _openViewer(0, items),
+            if (_isGridView) ...[
+              // Featured first item (full-width)
+              SliverToBoxAdapter(
+                child: _AnimatedGridItem(
+                  index: 0,
+                  controller: _gridCtrl,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+                    child: _FeaturedTile(
+                      item: items.first,
+                      onTap: () => _openViewer(0, items),
+                    ),
                   ),
                 ),
               ),
-            ),
-            // 2-column grid for the rest
-            if (items.length > 1)
+              // 2-column grid for the rest
+              if (items.length > 1)
+                SliverPadding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  sliver: SliverGrid(
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 2,
+                      mainAxisSpacing: 10,
+                      crossAxisSpacing: 10,
+                      childAspectRatio: 1,
+                    ),
+                    delegate: SliverChildBuilderDelegate((ctx, i) {
+                      final item = items[i + 1];
+                      return _AnimatedGridItem(
+                        index: i + 1,
+                        controller: _gridCtrl,
+                        child: _GridTile(
+                          item: item,
+                          onTap: () => _openViewer(i + 1, items),
+                        ),
+                      );
+                    }, childCount: items.length - 1),
+                  ),
+                ),
+            ] else ...[
+              // List view
               SliverPadding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
-                sliver: SliverGrid(
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    mainAxisSpacing: 10,
-                    crossAxisSpacing: 10,
-                    childAspectRatio: 1,
+                sliver: SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (ctx, i) {
+                      final item = items[i];
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: _AnimatedGridItem(
+                          index: i,
+                          controller: _gridCtrl,
+                          child: _ListTile(
+                            item: item,
+                            onTap: () => _openViewer(i, items),
+                          ),
+                        ),
+                      );
+                    },
+                    childCount: items.length,
                   ),
-                  delegate: SliverChildBuilderDelegate((ctx, i) {
-                    final item = items[i + 1];
-                    return _AnimatedGridItem(
-                      index: i + 1,
-                      controller: _gridCtrl,
-                      child: _GridTile(
-                        item: item,
-                        onTap: () => _openViewer(i + 1, items),
-                      ),
-                    );
-                  }, childCount: items.length - 1),
                 ),
               ),
+            ],
             if (_currentPage < _lastPage)
               SliverToBoxAdapter(child: _buildLoadMoreButton()),
           ] else
@@ -222,8 +242,15 @@ class _GaleriScreenState extends State<GaleriScreen>
       ),
       actions: [
         IconButton(
-          icon: const Icon(Icons.grid_view_rounded, color: AppColors.primary),
-          onPressed: () {},
+          icon: Icon(
+            _isGridView ? Icons.view_list_rounded : Icons.grid_view_rounded,
+            color: AppColors.primary,
+          ),
+          tooltip: _isGridView ? 'Tampilan List' : 'Tampilan Grid',
+          onPressed: () {
+            setState(() => _isGridView = !_isGridView);
+            _gridCtrl.forward(from: 0);
+          },
         ),
       ],
     );
@@ -893,6 +920,102 @@ class _GridTileState extends State<_GridTile>
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── List Tile (tampilan list) ─────────────────────────────────────────────────
+
+class _ListTile extends StatelessWidget {
+  final GaleriItem item;
+  final VoidCallback onTap;
+  const _ListTile({required this.item, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        height: 90,
+        decoration: BoxDecoration(
+          color: AppColors.white,
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            // Thumbnail
+            Hero(
+              tag: 'galeri-${item.id}',
+              child: ClipRRect(
+                borderRadius: const BorderRadius.horizontal(
+                    left: Radius.circular(14)),
+                child: CachedNetworkImage(
+                  imageUrl: item.imageUrl,
+                  width: 90,
+                  height: 90,
+                  fit: BoxFit.cover,
+                  placeholder: (_, __) => Shimmer.fromColors(
+                    baseColor: const Color(0xFFE8EDF2),
+                    highlightColor: const Color(0xFFF5F7FA),
+                    child: Container(color: Colors.white, width: 90),
+                  ),
+                  errorWidget: (_, __, ___) => Container(
+                    width: 90,
+                    color: AppColors.inputBg,
+                    child: const Icon(Icons.image_outlined,
+                        color: AppColors.textLight),
+                  ),
+                ),
+              ),
+            ),
+            // Info
+            Expanded(
+              child: Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      item.title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    if (item.date.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        item.date,
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 11,
+                          color: AppColors.textLight,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+            const Padding(
+              padding: EdgeInsets.only(right: 12),
+              child: Icon(Icons.chevron_right_rounded,
+                  color: AppColors.textLight, size: 20),
+            ),
+          ],
         ),
       ),
     );
