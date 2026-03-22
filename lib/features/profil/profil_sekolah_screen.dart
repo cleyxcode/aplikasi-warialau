@@ -671,8 +671,9 @@ class _ProfilTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final navBarHeight = 52.0 + 14.0 + MediaQuery.of(context).padding.bottom;
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
+      padding: EdgeInsets.fromLTRB(16, 0, 16, navBarHeight + 24),
       children: [
         const SizedBox(height: 4),
         _SectionTitle('Informasi Umum'),
@@ -910,8 +911,9 @@ class _VisiMisiTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final navBarHeight = 52.0 + 14.0 + MediaQuery.of(context).padding.bottom;
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
+      padding: EdgeInsets.fromLTRB(16, 4, 16, navBarHeight + 24),
       children: [
         _SectionTitle('Visi Sekolah'),
         const SizedBox(height: 12),
@@ -1114,8 +1116,9 @@ class _SejarahTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final navBarHeight = 52.0 + 14.0 + MediaQuery.of(context).padding.bottom;
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
+      padding: EdgeInsets.fromLTRB(16, 4, 16, navBarHeight + 24),
       children: [
         _SectionTitle('Sejarah Sekolah'),
         const SizedBox(height: 12),
@@ -1266,8 +1269,9 @@ class _KontakTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final navBarHeight = 52.0 + 14.0 + MediaQuery.of(context).padding.bottom;
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
+      padding: EdgeInsets.fromLTRB(16, 4, 16, navBarHeight + 24),
       children: [
         _SectionTitle('Hubungi Kami'),
         const SizedBox(height: 12),

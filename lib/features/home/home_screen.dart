@@ -11,6 +11,7 @@ import '../profil/profil_user_screen.dart';
 import '../notifikasi/notifikasi_screen.dart';
 import '../berita/berita_model.dart';
 import '../berita/detail_berita_screen.dart';
+import '../guru/guru_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final void Function(int)? onTabSwitch;
@@ -20,7 +21,8 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen>
+    with TickerProviderStateMixin {
   final PageController _bannerCtrl = PageController();
   int _bannerIndex = 0;
   Timer? _bannerTimer;
@@ -36,9 +38,20 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _pendaftaranAktif = false;
   bool _isLoadingData = true;
 
+  late AnimationController _fadeController;
+  late Animation<double> _fadeAnimation;
+
   @override
   void initState() {
     super.initState();
+    _fadeController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    );
+    _fadeAnimation = CurvedAnimation(
+      parent: _fadeController,
+      curve: Curves.easeOut,
+    );
     _loadData();
   }
 
@@ -46,6 +59,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void dispose() {
     _bannerTimer?.cancel();
     _bannerCtrl.dispose();
+    _fadeController.dispose();
     super.dispose();
   }
 
@@ -61,6 +75,7 @@ class _HomeScreenState extends State<HomeScreen> {
     ]);
     if (!mounted) return;
     setState(() => _isLoadingData = false);
+    _fadeController.forward();
     if (_bannerUrls.isNotEmpty) _startBannerTimer();
   }
 
@@ -156,13 +171,30 @@ class _HomeScreenState extends State<HomeScreen> {
       _userName.isNotEmpty ? _userName.split(' ').first : 'Pengguna';
 
   void _goDetailBerita(BeritaModel berita) => Navigator.push(
-    context,
-    AppRoute(page: DetailBeritaScreen(berita: berita)),
-  );
+        context,
+        AppRoute(page: DetailBeritaScreen(berita: berita)),
+      );
 
   void _goToBerita() => widget.onTabSwitch?.call(1);
   void _goToGaleri() => widget.onTabSwitch?.call(2);
   void _goToPendaftaran() => widget.onTabSwitch?.call(3);
+
+  Widget _shimmerBox({
+    required double width,
+    required double height,
+    required double radius,
+  }) {
+    return _ShimmerWrap(
+      child: Container(
+        width: width,
+        height: height,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(radius),
+        ),
+      ),
+    );
+  }
 
   // ── Build ───────────────────────────────────────────────────
 
@@ -174,29 +206,36 @@ class _HomeScreenState extends State<HomeScreen> {
         slivers: [
           _buildAppBar(),
           SliverToBoxAdapter(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildSearchBox(),
-                const SizedBox(height: 16),
-                _buildBannerSlider(),
-                const SizedBox(height: 24),
-                _buildSectionHeader('Berita Terbaru', _goToBerita),
-                const SizedBox(height: 12),
-                _buildBeritaList(),
-                const SizedBox(height: 20),
-                if (!_isLoadingData && _pendaftaranAktif)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: _buildPendaftaranCard(),
-                  ),
-                if (!_isLoadingData && _pendaftaranAktif)
+            child: FadeTransition(
+              opacity: _isLoadingData
+                  ? const AlwaysStoppedAnimation(1.0)
+                  : _fadeAnimation,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildSearchBox(),
+                  const SizedBox(height: 4),
+                  _buildQuickActions(),
+                  const SizedBox(height: 20),
+                  _buildBannerSlider(),
+                  const SizedBox(height: 28),
+                  _buildSectionHeader('Berita Terbaru', _goToBerita),
+                  const SizedBox(height: 14),
+                  _buildBeritaList(),
                   const SizedBox(height: 24),
-                _buildSectionHeader('Galeri Kegiatan', _goToGaleri),
-                const SizedBox(height: 12),
-                _buildGaleriList(),
-                const SizedBox(height: 28),
-              ],
+                  if (!_isLoadingData && _pendaftaranAktif) ...[
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: _buildPendaftaranCard(),
+                    ),
+                    const SizedBox(height: 28),
+                  ],
+                  _buildSectionHeader('Galeri Kegiatan', _goToGaleri),
+                  const SizedBox(height: 14),
+                  _buildGaleriList(),
+                  const SizedBox(height: 36),
+                ],
+              ),
             ),
           ),
         ],
@@ -210,12 +249,55 @@ class _HomeScreenState extends State<HomeScreen> {
     return SliverAppBar(
       pinned: true,
       elevation: 0,
-      scrolledUnderElevation: 1,
-      shadowColor: AppColors.divider,
-      backgroundColor: AppColors.gold,
+      scrolledUnderElevation: 2,
+      shadowColor: AppColors.primary.withValues(alpha: 0.3),
+      backgroundColor: Colors.transparent,
       surfaceTintColor: Colors.transparent,
       automaticallyImplyLeading: false,
-      toolbarHeight: 64,
+      toolbarHeight: 72,
+      flexibleSpace: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              AppColors.primary,
+              Color(0xFF2D5A9B),
+            ],
+          ),
+        ),
+        child: SafeArea(
+          child: Stack(
+            children: [
+              // Decorative circles
+              Positioned(
+                top: -20,
+                right: 60,
+                child: Container(
+                  width: 100,
+                  height: 100,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white.withValues(alpha: 0.05),
+                  ),
+                ),
+              ),
+              Positioned(
+                bottom: -30,
+                left: 80,
+                child: Container(
+                  width: 80,
+                  height: 80,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: AppColors.gold.withValues(alpha: 0.08),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
       title: GestureDetector(
         onTap: () =>
             Navigator.push(
@@ -229,31 +311,41 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Row(
           children: [
             // Avatar
-            Container(
-              width: 42,
-              height: 42,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: AppColors.primary,
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.primary.withValues(alpha: 0.25),
-                    blurRadius: 10,
-                    offset: const Offset(0, 3),
+            RepaintBoundary(
+              child: Container(
+                width: 46,
+                height: 46,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [Color(0xFF3A6AB0), Color(0xFF1A2F50)],
                   ),
-                ],
-              ),
-              child: Center(
-                child: _isLoadingData
-                    ? _shimmerBox(width: 16, height: 16, radius: 8)
-                    : Text(
-                        _initials,
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.white,
+                  border: Border.all(
+                    color: AppColors.gold.withValues(alpha: 0.5),
+                    width: 2,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.2),
+                      blurRadius: 10,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: Center(
+                  child: _isLoadingData
+                      ? _shimmerBox(width: 16, height: 16, radius: 8)
+                      : Text(
+                          _initials,
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.white,
+                          ),
                         ),
-                      ),
+                ),
               ),
             ),
             const SizedBox(width: 12),
@@ -272,21 +364,29 @@ class _HomeScreenState extends State<HomeScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Text(
-                          'Halo, $_firstName! 👋',
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 15,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.white,
-                          ),
+                        Row(
+                          children: [
+                            Text(
+                              'Halo, $_firstName!',
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.white,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            const Text('👋', style: TextStyle(fontSize: 15)),
+                          ],
                         ),
-                        Text(
-                          _userRole,
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 11,
-                            color: AppColors.white.withValues(alpha: 0.8),
+                        if (_userRole.isNotEmpty)
+                          Text(
+                            _userRole,
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                              color: AppColors.white.withValues(alpha: 0.75),
+                            ),
                           ),
-                        ),
                       ],
                     ),
             ),
@@ -295,7 +395,7 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       actions: [
         Padding(
-          padding: const EdgeInsets.only(right: 12),
+          padding: const EdgeInsets.only(right: 16),
           child: GestureDetector(
             onTap: () => Navigator.push(
               context,
@@ -305,13 +405,14 @@ class _HomeScreenState extends State<HomeScreen> {
               clipBehavior: Clip.none,
               children: [
                 Container(
-                  width: 42,
-                  height: 42,
+                  width: 44,
+                  height: 44,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: AppColors.white.withValues(alpha: 0.15),
+                    color: Colors.white.withValues(alpha: 0.12),
                     border: Border.all(
-                      color: AppColors.white.withValues(alpha: 0.1),
+                      color: Colors.white.withValues(alpha: 0.15),
+                      width: 1,
                     ),
                   ),
                   child: const Icon(
@@ -321,8 +422,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
                 Positioned(
-                  top: 7,
-                  right: 7,
+                  top: 8,
+                  right: 8,
                   child: Container(
                     width: 9,
                     height: 9,
@@ -345,7 +446,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildSearchBox() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
       child: GestureDetector(
         onTap: () {
           // TODO: Navigate to search screen or open search delegate
@@ -356,19 +457,19 @@ class _HomeScreenState extends State<HomeScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 16),
           decoration: BoxDecoration(
             color: AppColors.white,
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(16),
             border: Border.all(color: AppColors.divider),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.04),
-                blurRadius: 10,
+                color: Colors.black.withValues(alpha: 0.05),
+                blurRadius: 12,
                 offset: const Offset(0, 2),
               ),
             ],
           ),
           child: Row(
             children: [
-              Icon(
+              const Icon(
                 Icons.search_rounded,
                 color: AppColors.textLight,
                 size: 22,
@@ -403,6 +504,50 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  // ── Quick Actions ────────────────────────────────────────
+
+  Widget _buildQuickActions() {
+    final actions = [
+      _QuickActionData(
+        icon: Icons.newspaper_rounded,
+        label: 'Berita',
+        gradientColors: const [Color(0xFF3B82F6), Color(0xFF1D4ED8)],
+        onTap: _goToBerita,
+      ),
+      _QuickActionData(
+        icon: Icons.photo_library_rounded,
+        label: 'Galeri',
+        gradientColors: const [Color(0xFF22C55E), Color(0xFF15803D)],
+        onTap: _goToGaleri,
+      ),
+      _QuickActionData(
+        icon: Icons.people_rounded,
+        label: 'Guru',
+        gradientColors: const [Color(0xFF8B5CF6), Color(0xFF6D28D9)],
+        onTap: () => Navigator.push(
+          context,
+          AppRoute(page: const GuruScreen()),
+        ),
+      ),
+      _QuickActionData(
+        icon: Icons.assignment_rounded,
+        label: 'Daftar',
+        gradientColors: const [AppColors.gold, Color(0xFFB8860B)],
+        onTap: _goToPendaftaran,
+      ),
+    ];
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: actions
+            .map((a) => Expanded(child: _QuickActionButton(data: a)))
+            .toList(),
+      ),
+    );
+  }
+
   // ── Banner Slider ─────────────────────────────────────────
 
   Widget _buildBannerSlider() {
@@ -411,10 +556,10 @@ class _HomeScreenState extends State<HomeScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: _ShimmerWrap(
           child: Container(
-            height: 180,
+            height: 196,
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(20),
             ),
           ),
         ),
@@ -425,15 +570,24 @@ class _HomeScreenState extends State<HomeScreen> {
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(20),
           child: Container(
-            height: 180,
-            color: AppColors.inputBg,
+            height: 196,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  AppColors.primary.withValues(alpha: 0.08),
+                  AppColors.gold.withValues(alpha: 0.05),
+                ],
+              ),
+            ),
             child: Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(
+                  Icon(
                     Icons.image_outlined,
                     color: AppColors.textLight,
                     size: 40,
@@ -457,46 +611,41 @@ class _HomeScreenState extends State<HomeScreen> {
     return Column(
       children: [
         SizedBox(
-          height: 180,
+          height: 196,
           child: PageView.builder(
             controller: _bannerCtrl,
             itemCount: _bannerUrls.length,
             onPageChanged: (i) => setState(() => _bannerIndex = i),
             itemBuilder: (_, index) => Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(16),
-                child: CachedNetworkImage(
-                  imageUrl: _bannerUrls[index],
-                  fit: BoxFit.cover,
-                  placeholder: (_, __) =>
-                      _ShimmerWrap(child: Container(color: Colors.white)),
-                  errorWidget: (_, __, ___) => Container(
-                    color: AppColors.inputBg,
-                    child: const Icon(
-                      Icons.image_outlined,
-                      color: AppColors.textLight,
-                      size: 40,
-                    ),
-                  ),
-                ),
-              ),
+              child: _BannerItem(imageUrl: _bannerUrls[index]),
             ),
           ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 14),
+        // Modern pill indicator
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: List.generate(_bannerUrls.length, (i) {
             final active = i == _bannerIndex;
             return AnimatedContainer(
               duration: const Duration(milliseconds: 300),
+              curve: Curves.easeInOut,
               margin: const EdgeInsets.symmetric(horizontal: 3),
-              width: active ? 24 : 7,
+              width: active ? 28 : 7,
               height: 7,
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(999),
                 color: active ? AppColors.gold : const Color(0xFFCDD5DF),
+                boxShadow: active
+                    ? [
+                        BoxShadow(
+                          color: AppColors.gold.withValues(alpha: 0.4),
+                          blurRadius: 6,
+                          offset: const Offset(0, 2),
+                        )
+                      ]
+                    : null,
               ),
             );
           }),
@@ -513,32 +662,54 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            title,
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 17,
-              fontWeight: FontWeight.bold,
-              color: AppColors.textPrimary,
-            ),
+          Row(
+            children: [
+              // Gold accent bar
+              Container(
+                width: 3,
+                height: 18,
+                decoration: BoxDecoration(
+                  color: AppColors.gold,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                title,
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 17,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ],
           ),
           GestureDetector(
             onTap: onTap,
-            child: Row(
-              children: [
-                Text(
-                  'Lihat Semua',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.gold,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: AppColors.gold.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Row(
+                children: [
+                  Text(
+                    'Lihat Semua',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.gold,
+                    ),
                   ),
-                ),
-                const Icon(
-                  Icons.chevron_right_rounded,
-                  color: AppColors.gold,
-                  size: 18,
-                ),
-              ],
+                  const SizedBox(width: 2),
+                  const Icon(
+                    Icons.chevron_right_rounded,
+                    color: AppColors.gold,
+                    size: 16,
+                  ),
+                ],
+              ),
             ),
           ),
         ],
@@ -551,29 +722,28 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildBeritaList() {
     if (_isLoadingData) {
       return SizedBox(
-        height: 240,
+        height: 252,
         child: ListView.separated(
           scrollDirection: Axis.horizontal,
           padding: const EdgeInsets.symmetric(horizontal: 16),
           itemCount: 3,
-          separatorBuilder: (_, __) => const SizedBox(width: 12),
+          separatorBuilder: (_, __) => const SizedBox(width: 14),
           itemBuilder: (_, __) => _ShimmerWrap(
             child: Container(
-              width: 230,
+              width: 240,
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(18),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Image placeholder
                   Container(
-                    height: 130,
+                    height: 140,
                     decoration: const BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.vertical(
-                        top: Radius.circular(16),
+                        top: Radius.circular(18),
                       ),
                     ),
                   ),
@@ -582,7 +752,6 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Badge
                         Container(
                           width: 60,
                           height: 18,
@@ -592,7 +761,6 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                         ),
                         const SizedBox(height: 8),
-                        // Title line 1
                         Container(
                           width: double.infinity,
                           height: 12,
@@ -602,9 +770,8 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                         ),
                         const SizedBox(height: 6),
-                        // Title line 2
                         Container(
-                          width: 140,
+                          width: 150,
                           height: 12,
                           decoration: BoxDecoration(
                             color: Colors.white,
@@ -612,7 +779,6 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                         ),
                         const SizedBox(height: 10),
-                        // Date
                         Container(
                           width: 80,
                           height: 10,
@@ -650,12 +816,12 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     return SizedBox(
-      height: 240,
+      height: 252,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 16),
         itemCount: _beritaItems.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 12),
+        separatorBuilder: (_, __) => const SizedBox(width: 14),
         itemBuilder: (_, i) => _BeritaCard(
           item: _beritaItems[i],
           onTap: () => _goDetailBerita(_beritaItems[i]),
@@ -669,65 +835,121 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildPendaftaranCard() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
-        color: AppColors.gold,
-        borderRadius: BorderRadius.circular(20),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            AppColors.gold,
+            Color(0xFFE8C04A),
+            Color(0xFFC8A020),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(22),
         boxShadow: [
           BoxShadow(
-            color: AppColors.gold.withValues(alpha: 0.35),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
+            color: AppColors.gold.withValues(alpha: 0.4),
+            blurRadius: 24,
+            offset: const Offset(0, 10),
           ),
         ],
       ),
       child: Stack(
+        clipBehavior: Clip.none,
         children: [
+          // Background pattern circles
+          Positioned(
+            right: -18,
+            top: -18,
+            child: Container(
+              width: 100,
+              height: 100,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withValues(alpha: 0.12),
+              ),
+            ),
+          ),
+          Positioned(
+            right: 40,
+            bottom: -24,
+            child: Container(
+              width: 70,
+              height: 70,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: AppColors.primary.withValues(alpha: 0.1),
+              ),
+            ),
+          ),
           Positioned(
             right: -8,
             bottom: -8,
             child: Icon(
               Icons.school_rounded,
-              size: 90,
-              color: AppColors.primary.withValues(alpha: 0.15),
+              size: 96,
+              color: AppColors.primary.withValues(alpha: 0.12),
             ),
           ),
+          // Content
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  'PENDAFTARAN DIBUKA',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.primary,
+                    letterSpacing: 1.0,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
               Text(
-                'Pendaftaran Dibuka!',
+                'Tahun Ajaran\n$_tahunAjaran',
                 style: GoogleFonts.plusJakartaSans(
-                  fontSize: 20,
+                  fontSize: 22,
                   fontWeight: FontWeight.bold,
                   color: AppColors.primary,
+                  height: 1.25,
                 ),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 6),
               Text(
-                'Tahun Ajaran $_tahunAjaran',
+                'Daftarkan putra-putri Anda sekarang.',
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.primary.withValues(alpha: 0.75),
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.primary.withValues(alpha: 0.7),
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 18),
               GestureDetector(
                 onTap: _goToPendaftaran,
                 child: Container(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 12,
+                    horizontal: 22,
+                    vertical: 13,
                   ),
                   decoration: BoxDecoration(
                     color: AppColors.primary,
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(14),
                     boxShadow: [
                       BoxShadow(
-                        color: AppColors.primary.withValues(alpha: 0.35),
-                        blurRadius: 12,
-                        offset: const Offset(0, 4),
+                        color: AppColors.primary.withValues(alpha: 0.4),
+                        blurRadius: 14,
+                        offset: const Offset(0, 5),
                       ),
                     ],
                   ),
@@ -743,10 +965,18 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ),
                       const SizedBox(width: 8),
-                      const Icon(
-                        Icons.arrow_forward_rounded,
-                        color: AppColors.white,
-                        size: 18,
+                      Container(
+                        width: 24,
+                        height: 24,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.white.withValues(alpha: 0.15),
+                        ),
+                        child: const Icon(
+                          Icons.arrow_forward_rounded,
+                          color: AppColors.white,
+                          size: 14,
+                        ),
                       ),
                     ],
                   ),
@@ -764,7 +994,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildGaleriList() {
     if (_isLoadingData) {
       return SizedBox(
-        height: 128,
+        height: 136,
         child: ListView.separated(
           scrollDirection: Axis.horizontal,
           padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -772,11 +1002,11 @@ class _HomeScreenState extends State<HomeScreen> {
           separatorBuilder: (_, __) => const SizedBox(width: 10),
           itemBuilder: (_, __) => _ShimmerWrap(
             child: Container(
-              width: 128,
-              height: 128,
+              width: 136,
+              height: 136,
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: BorderRadius.circular(16),
               ),
             ),
           ),
@@ -802,52 +1032,13 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     return SizedBox(
-      height: 128,
+      height: 136,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 16),
         itemCount: _galeriUrls.length,
         separatorBuilder: (_, __) => const SizedBox(width: 10),
-        itemBuilder: (_, i) => ClipRRect(
-          borderRadius: BorderRadius.circular(14),
-          child: CachedNetworkImage(
-            imageUrl: _galeriUrls[i],
-            width: 128,
-            height: 128,
-            fit: BoxFit.cover,
-            placeholder: (_, __) => _ShimmerWrap(
-              child: Container(width: 128, height: 128, color: Colors.white),
-            ),
-            errorWidget: (_, __, ___) => Container(
-              width: 128,
-              height: 128,
-              color: AppColors.inputBg,
-              child: const Icon(
-                Icons.image_outlined,
-                color: AppColors.textLight,
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  // ── Shimmer helper ────────────────────────────────────────
-
-  Widget _shimmerBox({
-    required double width,
-    required double height,
-    required double radius,
-  }) {
-    return _ShimmerWrap(
-      child: Container(
-        width: width,
-        height: height,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(radius),
-        ),
+        itemBuilder: (_, i) => _GaleriItem(imageUrl: _galeriUrls[i]),
       ),
     );
   }
@@ -870,13 +1061,217 @@ class _ShimmerWrap extends StatelessWidget {
   }
 }
 
+// ── Quick Action Data ─────────────────────────────────────────────────────────
+
+class _QuickActionData {
+  final IconData icon;
+  final String label;
+  final List<Color> gradientColors;
+  final VoidCallback onTap;
+
+  const _QuickActionData({
+    required this.icon,
+    required this.label,
+    required this.gradientColors,
+    required this.onTap,
+  });
+}
+
+// ── Quick Action Button ───────────────────────────────────────────────────────
+
+class _QuickActionButton extends StatefulWidget {
+  final _QuickActionData data;
+  const _QuickActionButton({required this.data});
+
+  @override
+  State<_QuickActionButton> createState() => _QuickActionButtonState();
+}
+
+class _QuickActionButtonState extends State<_QuickActionButton>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+  late Animation<double> _scale;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 120),
+      lowerBound: 0.0,
+      upperBound: 0.05,
+    );
+    _scale = Tween<double>(begin: 1.0, end: 0.93).animate(
+      CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: (_) => _ctrl.forward(),
+      onTapUp: (_) {
+        _ctrl.reverse();
+        widget.data.onTap();
+      },
+      onTapCancel: () => _ctrl.reverse(),
+      child: RepaintBoundary(
+        child: ScaleTransition(
+          scale: _scale,
+          child: Column(
+            children: [
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: widget.data.gradientColors,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: widget.data.gradientColors.first
+                          .withValues(alpha: 0.3),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Icon(
+                  widget.data.icon,
+                  color: Colors.white,
+                  size: 26,
+                ),
+              ),
+              const SizedBox(height: 7),
+              Text(
+                widget.data.label,
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Banner Item ───────────────────────────────────────────────────────────────
+
+class _BannerItem extends StatelessWidget {
+  final String imageUrl;
+  const _BannerItem({required this.imageUrl});
+
+  @override
+  Widget build(BuildContext context) {
+    return RepaintBoundary(
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            CachedNetworkImage(
+              imageUrl: imageUrl,
+              fit: BoxFit.cover,
+              placeholder: (_, __) =>
+                  _ShimmerWrap(child: Container(color: Colors.white)),
+              errorWidget: (_, __, ___) => Container(
+                color: AppColors.inputBg,
+                child: const Icon(
+                  Icons.image_outlined,
+                  color: AppColors.textLight,
+                  size: 40,
+                ),
+              ),
+            ),
+            // Gradient overlay at bottom
+            Positioned(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              child: Container(
+                height: 72,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.transparent,
+                      Colors.black.withValues(alpha: 0.45),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Galeri Item ───────────────────────────────────────────────────────────────
+
+class _GaleriItem extends StatelessWidget {
+  final String imageUrl;
+  const _GaleriItem({required this.imageUrl});
+
+  @override
+  Widget build(BuildContext context) {
+    return RepaintBoundary(
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: CachedNetworkImage(
+          imageUrl: imageUrl,
+          width: 136,
+          height: 136,
+          fit: BoxFit.cover,
+          placeholder: (_, __) => _ShimmerWrap(
+            child: Container(width: 136, height: 136, color: Colors.white),
+          ),
+          errorWidget: (_, __, ___) => Container(
+            width: 136,
+            height: 136,
+            color: AppColors.inputBg,
+            child: const Icon(
+              Icons.image_outlined,
+              color: AppColors.textLight,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 // ── Berita Card Widget ────────────────────────────────────────────────────────
 
-class _BeritaCard extends StatelessWidget {
+class _BeritaCard extends StatefulWidget {
   final BeritaModel item;
   final VoidCallback? onTap;
 
   const _BeritaCard({required this.item, this.onTap});
+
+  @override
+  State<_BeritaCard> createState() => _BeritaCardState();
+}
+
+class _BeritaCardState extends State<_BeritaCard>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+  late Animation<double> _scale;
 
   static const _badgeColor = {
     'PRESTASI': Color(0xFFF59E0B),
@@ -886,118 +1281,178 @@ class _BeritaCard extends StatelessWidget {
   };
 
   @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 120),
+    );
+    _scale = Tween<double>(begin: 1.0, end: 0.97).animate(
+      CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final categoryLabel = item.category.toUpperCase();
+    final categoryLabel = widget.item.category.toUpperCase();
     final badgeColor = _badgeColor[categoryLabel] ?? AppColors.gold;
 
     return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 230,
-        decoration: BoxDecoration(
-          color: AppColors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.07),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Stack(
-              children: [
-                ClipRRect(
-                  borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(16),
-                  ),
-                  child: CachedNetworkImage(
-                    imageUrl: item.imageUrl,
-                    height: 130,
-                    width: double.infinity,
-                    fit: BoxFit.cover,
-                    placeholder: (_, __) => Shimmer.fromColors(
-                      baseColor: const Color(0xFFE8EDF2),
-                      highlightColor: const Color(0xFFF5F7FA),
-                      child: Container(height: 130, color: Colors.white),
-                    ),
-                    errorWidget: (_, __, ___) => Container(
-                      height: 130,
-                      color: AppColors.inputBg,
-                      child: const Icon(
-                        Icons.image_outlined,
-                        color: AppColors.textLight,
-                        size: 32,
-                      ),
-                    ),
-                  ),
-                ),
-                Positioned(
-                  top: 10,
-                  left: 10,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: badgeColor,
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      categoryLabel,
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.white,
-                        letterSpacing: 0.8,
-                      ),
-                    ),
-                  ),
+      onTapDown: (_) => _ctrl.forward(),
+      onTapUp: (_) {
+        _ctrl.reverse();
+        widget.onTap?.call();
+      },
+      onTapCancel: () => _ctrl.reverse(),
+      child: RepaintBoundary(
+        child: ScaleTransition(
+          scale: _scale,
+          child: Container(
+            width: 240,
+            decoration: BoxDecoration(
+              color: AppColors.white,
+              borderRadius: BorderRadius.circular(18),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.07),
+                  blurRadius: 16,
+                  offset: const Offset(0, 5),
                 ),
               ],
             ),
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    item.title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 13,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.textPrimary,
-                      height: 1.4,
-                    ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Image with gradient overlay
+                ClipRRect(
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(18),
                   ),
-                  const SizedBox(height: 8),
-                  Row(
+                  child: Stack(
                     children: [
-                      const Icon(
-                        Icons.calendar_today_outlined,
-                        size: 12,
-                        color: AppColors.textLight,
+                      CachedNetworkImage(
+                        imageUrl: widget.item.imageUrl,
+                        height: 140,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                        placeholder: (_, __) => Shimmer.fromColors(
+                          baseColor: const Color(0xFFE8EDF2),
+                          highlightColor: const Color(0xFFF5F7FA),
+                          child: Container(height: 140, color: Colors.white),
+                        ),
+                        errorWidget: (_, __, ___) => Container(
+                          height: 140,
+                          color: AppColors.inputBg,
+                          child: const Icon(
+                            Icons.image_outlined,
+                            color: AppColors.textLight,
+                            size: 32,
+                          ),
+                        ),
                       ),
-                      const SizedBox(width: 4),
-                      Text(
-                        item.date,
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 11,
-                          color: AppColors.textLight,
+                      // Gradient overlay at bottom of image
+                      Positioned(
+                        bottom: 0,
+                        left: 0,
+                        right: 0,
+                        child: Container(
+                          height: 56,
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [
+                                Colors.transparent,
+                                Colors.black.withValues(alpha: 0.4),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      // Category badge
+                      Positioned(
+                        top: 10,
+                        left: 10,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 9,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: badgeColor,
+                            borderRadius: BorderRadius.circular(8),
+                            boxShadow: [
+                              BoxShadow(
+                                color: badgeColor.withValues(alpha: 0.4),
+                                blurRadius: 6,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Text(
+                            categoryLabel,
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.white,
+                              letterSpacing: 0.8,
+                            ),
+                          ),
                         ),
                       ),
                     ],
                   ),
-                ],
-              ),
+                ),
+                // Content
+                Padding(
+                  padding: const EdgeInsets.all(13),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        widget.item.title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.textPrimary,
+                          height: 1.4,
+                        ),
+                      ),
+                      const SizedBox(height: 9),
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.calendar_today_outlined,
+                            size: 12,
+                            color: AppColors.textLight,
+                          ),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              widget.item.date,
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 11,
+                                color: AppColors.textLight,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );

@@ -125,15 +125,22 @@ class _SplashScreenState extends State<SplashScreen>
       if (s == AnimationStatus.completed) {
         Future.delayed(const Duration(milliseconds: 350), () async {
           if (!mounted) return;
-          final loggedIn = await StorageService.isLoggedIn();
-          if (!mounted) return;
-          if (loggedIn) {
-            setState(() => _showRocket = true);
-            await Future.delayed(const Duration(milliseconds: 2800));
+          try {
+            final loggedIn = await StorageService.isLoggedIn();
             if (!mounted) return;
-            Navigator.pushReplacementNamed(context, '/home');
-          } else {
-            Navigator.pushReplacementNamed(context, '/onboarding');
+            if (loggedIn) {
+              setState(() => _showRocket = true);
+              await Future.delayed(const Duration(milliseconds: 2800));
+              if (!mounted) return;
+              Navigator.pushReplacementNamed(context, '/home');
+            } else {
+              Navigator.pushReplacementNamed(context, '/onboarding');
+            }
+          } catch (e) {
+            debugPrint('[Splash] Navigation error: $e');
+            if (mounted) {
+              Navigator.pushReplacementNamed(context, '/onboarding');
+            }
           }
         });
       }
@@ -421,34 +428,49 @@ class _SplashScreenState extends State<SplashScreen>
                         ),
                         const SizedBox(height: 8),
                         // Glowing progress bar
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(999),
-                          child: Container(
-                            height: 4,
-                            color: Colors.white.withValues(alpha: 0.08),
-                            child: FractionallySizedBox(
-                              alignment: Alignment.centerLeft,
-                              widthFactor: _progress.value,
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  gradient: const LinearGradient(
-                                    colors: [
-                                      AppColors.gold,
-                                      Color(0xFFF5D060),
-                                    ],
-                                  ),
-                                  borderRadius: BorderRadius.circular(999),
-                                  boxShadow: [
-                                    BoxShadow(
+                        LayoutBuilder(
+                          builder: (context, constraints) {
+                            final barWidth =
+                                constraints.maxWidth * _progress.value;
+                            return SizedBox(
+                              height: 4,
+                              child: Stack(
+                                children: [
+                                  Container(
+                                    height: 4,
+                                    decoration: BoxDecoration(
                                       color:
-                                          AppColors.gold.withValues(alpha: 0.7),
-                                      blurRadius: 8,
+                                          Colors.white.withValues(alpha: 0.08),
+                                      borderRadius:
+                                          BorderRadius.circular(999),
                                     ),
-                                  ],
-                                ),
+                                  ),
+                                  if (barWidth > 0)
+                                    Container(
+                                      height: 4,
+                                      width: barWidth,
+                                      decoration: BoxDecoration(
+                                        gradient: const LinearGradient(
+                                          colors: [
+                                            AppColors.gold,
+                                            Color(0xFFF5D060),
+                                          ],
+                                        ),
+                                        borderRadius:
+                                            BorderRadius.circular(999),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: AppColors.gold
+                                                .withValues(alpha: 0.7),
+                                            blurRadius: 8,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                ],
                               ),
-                            ),
-                          ),
+                            );
+                          },
                         ),
                       ],
                     );

@@ -203,34 +203,64 @@ class _BeritaScreenState extends State<BeritaScreen>
 
   Widget _buildAppBar() {
     return Container(
-      height: 56,
-      padding: const EdgeInsets.symmetric(horizontal: 8),
       decoration: const BoxDecoration(
-        color: AppColors.white,
-        border: Border(bottom: BorderSide(color: AppColors.divider)),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF1F3B61), Color(0xFF2D5A9B)],
+        ),
       ),
-      child: Row(
-        children: [
-          const SizedBox(width: 48),
-          Expanded(
-            child: Text(
-              'Berita & Pengumuman',
-              textAlign: TextAlign.center,
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 17,
-                fontWeight: FontWeight.bold,
-                color: AppColors.primary,
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Berita & Pengumuman',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                    Text(
+                      'Informasi terkini dari sekolah',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 12,
+                        color: Colors.white.withValues(alpha: 0.6),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.2),
+                  ),
+                ),
+                child: IconButton(
+                  padding: EdgeInsets.zero,
+                  icon: const Icon(
+                    Icons.bookmark_border_rounded,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                  onPressed: () {},
+                ),
+              ),
+            ],
           ),
-          IconButton(
-            icon: const Icon(
-              Icons.bookmark_border_rounded,
-              color: AppColors.primary,
-            ),
-            onPressed: () {},
-          ),
-        ],
+        ),
       ),
     );
   }

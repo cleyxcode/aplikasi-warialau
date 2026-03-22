@@ -1,7 +1,7 @@
 /// Konfigurasi URL API — ubah [_baseHost] saja untuk ganti domain.
 class AppConstants {
   // ── Ganti domain di sini saja ────────────────────────────────────────────
-  static const String _baseHost = 'http://127.0.0.1:8000';
+  static const String _baseHost = 'https://lightyellow-dragonfly-487639.hostingersite.com';
   // ─────────────────────────────────────────────────────────────────────────
 
   static const String baseUrl = '$_baseHost/api/v1';

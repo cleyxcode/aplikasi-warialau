@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lottie/lottie.dart';
 import '../../core/constants/app_colors.dart';
@@ -25,22 +26,30 @@ class _MainNavigationState extends State<MainNavigation>
   final List<UniqueKey> _pageKeys = List.generate(5, (_) => UniqueKey());
 
   static const _tabs = [
-    _TabItem(icon: Icons.home_outlined, activeIcon: Icons.home_rounded),
+    _TabItem(
+      icon: Icons.home_outlined,
+      activeIcon: Icons.home_rounded,
+      label: 'Beranda',
+    ),
     _TabItem(
       icon: Icons.newspaper_outlined,
       activeIcon: Icons.newspaper_rounded,
+      label: 'Berita',
     ),
     _TabItem(
       icon: Icons.photo_library_outlined,
       activeIcon: Icons.photo_library_rounded,
+      label: 'Galeri',
     ),
     _TabItem(
       icon: Icons.assignment_outlined,
       activeIcon: Icons.assignment_rounded,
+      label: 'Daftar',
     ),
     _TabItem(
       icon: Icons.account_balance_outlined,
       activeIcon: Icons.account_balance_rounded,
+      label: 'Profil',
     ),
   ];
 
@@ -66,12 +75,14 @@ class _MainNavigationState extends State<MainNavigation>
   }
 
   void _onTabTap(int index) {
+    HapticFeedback.lightImpact();
     if (index == _currentIndex) {
       // Double-tap pada tab aktif → refresh halaman
       _refreshCurrentPage();
       return;
     }
-    setState(() => _currentIndex = index);
+    // Jangan panggil setState di sini — biarkan onPageChanged yang update state
+    // agar tidak terjadi double setState dalam satu frame (menyebabkan layout error)
     _pageCtrl.jumpToPage(index);
   }
 
@@ -185,12 +196,24 @@ class _KeepAlivePageState extends State<_KeepAlivePage>
 class _TabItem {
   final IconData icon;
   final IconData activeIcon;
-  const _TabItem({required this.icon, required this.activeIcon});
+  final String label;
+  const _TabItem({
+    required this.icon,
+    required this.activeIcon,
+    required this.label,
+  });
 }
 
 // ── Floating Nav Bar ──────────────────────────────────────────────────────────
+// TIDAK menggunakan LayoutBuilder karena LayoutBuilder melakukan
+// _rebuildWithConstraints SELAMA fase layout Scaffold (_ScaffoldLayout.performLayout).
+// Jika ada widget animasi yang dirty di dalamnya, akan terjadi crash
+// "Each child must be laid out exactly once".
+//
+// Solusi: AnimatedAlign + FractionallySizedBox — tidak butuh constraint runtime,
+// tidak ada LayoutBuilder, posisi dihitung dari currentIndex saja.
 
-class _FloatingNavBar extends StatefulWidget {
+class _FloatingNavBar extends StatelessWidget {
   final int currentIndex;
   final List<_TabItem> tabs;
   final double bottomPad;
@@ -203,127 +226,122 @@ class _FloatingNavBar extends StatefulWidget {
     required this.onTap,
   });
 
-  @override
-  State<_FloatingNavBar> createState() => _FloatingNavBarState();
-}
-
-class _FloatingNavBarState extends State<_FloatingNavBar> {
-  // Simpan index sebelumnya untuk animasi dari posisi lama ke baru
-  int _prevIndex = 0;
-
-  @override
-  void didUpdateWidget(_FloatingNavBar oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.currentIndex != widget.currentIndex) {
-      _prevIndex = oldWidget.currentIndex;
-    }
-  }
+  // Alignment pill dari -1.0 (tab 0) hingga 1.0 (tab terakhir)
+  // Formula: (2i - n + 1) / (n - 1)  di mana n = jumlah tab, i = currentIndex
+  double get _pillAlignment =>
+      (2.0 * currentIndex - tabs.length + 1) / (tabs.length - 1);
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: EdgeInsets.fromLTRB(28, 0, 28, widget.bottomPad + 14),
-      child: LayoutBuilder(
-        builder: (ctx, constraints) {
-          final itemW = constraints.maxWidth / widget.tabs.length;
-
-          return Container(
-            height: 52,
-            decoration: BoxDecoration(
-              color: AppColors.primary,
-              borderRadius: BorderRadius.circular(26),
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.primary.withValues(alpha: 0.38),
-                  blurRadius: 18,
-                  offset: const Offset(0, 7),
-                ),
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.10),
-                  blurRadius: 5,
-                  offset: const Offset(0, 2),
-                ),
-              ],
+      padding: EdgeInsets.fromLTRB(24, 0, 24, bottomPad + 12),
+      child: Container(
+        height: 64,
+        decoration: BoxDecoration(
+          color: AppColors.primary,
+          borderRadius: BorderRadius.circular(32),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.primary.withValues(alpha: 0.45),
+              blurRadius: 24,
+              offset: const Offset(0, 8),
             ),
-            child: Stack(
-              children: [
-                // ── Gold pill – TweenAnimationBuilder agar smooth tanpa bug
-                TweenAnimationBuilder<double>(
-                  key: const ValueKey('pill'),
-                  tween: Tween<double>(
-                    begin: itemW * _prevIndex,
-                    end: itemW * widget.currentIndex,
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.12),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Stack(
+          children: [
+            // ── Gold pill: AnimatedAlign + FractionallySizedBox
+            // Tidak perlu LayoutBuilder, tidak ada Positioned,
+            // animasi aman karena tidak terikat ke layout callback.
+            AnimatedAlign(
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeInOutCubic,
+              alignment: Alignment(_pillAlignment, 0),
+              child: FractionallySizedBox(
+                widthFactor: 1.0 / tabs.length,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 6,
                   ),
-                  duration: const Duration(milliseconds: 280),
-                  curve: Curves.easeInOutCubic,
-                  builder: (_, left, __) {
-                    return Positioned(
-                      left: left + 5,
-                      top: 5,
-                      bottom: 5,
-                      width: itemW - 10,
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: AppColors.gold,
-                          borderRadius: BorderRadius.circular(21),
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppColors.gold.withValues(alpha: 0.42),
-                              blurRadius: 8,
-                              offset: const Offset(0, 3),
-                            ),
-                          ],
-                        ),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [AppColors.gold, Color(0xFFE8C842)],
                       ),
-                    );
-                  },
+                      borderRadius: BorderRadius.circular(26),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.gold.withValues(alpha: 0.45),
+                          blurRadius: 10,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
+              ),
+            ),
 
-                // ── Icon buttons
-                Row(
-                  children: List.generate(widget.tabs.length, (i) {
-                    final active = i == widget.currentIndex;
-                    final tab = widget.tabs[i];
-                    return Expanded(
-                      child: GestureDetector(
-                        behavior: HitTestBehavior.opaque,
-                        onTap: () => widget.onTap(i),
-                        child: Center(
-                          child: AnimatedSwitcher(
-                            duration: const Duration(milliseconds: 180),
-                            switchInCurve: Curves.easeOutCubic,
-                            switchOutCurve: Curves.easeInCubic,
-                            transitionBuilder: (child, anim) => ScaleTransition(
-                              scale: Tween<double>(begin: 0.7, end: 1.0)
-                                  .animate(
-                                    CurvedAnimation(
-                                      parent: anim,
-                                      curve: Curves.easeOutBack,
-                                    ),
-                                  ),
-                              child: FadeTransition(
-                                opacity: anim,
-                                child: child,
-                              ),
-                            ),
+            // ── Tab items
+            Row(
+              children: List.generate(tabs.length, (i) {
+                final active = i == currentIndex;
+                final tab = tabs[i];
+                return Expanded(
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () => onTap(i),
+                    child: Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 200),
                             child: Icon(
                               active ? tab.activeIcon : tab.icon,
                               key: ValueKey('icon_${i}_$active'),
-                              size: active ? 21 : 19,
+                              size: active ? 22 : 20,
                               color: active
                                   ? AppColors.primary
-                                  : Colors.white.withValues(alpha: 0.5),
+                                  : Colors.white.withValues(alpha: 0.45),
                             ),
                           ),
-                        ),
+                          AnimatedOpacity(
+                            opacity: active ? 1.0 : 0.0,
+                            duration: const Duration(milliseconds: 180),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 180),
+                              height: active ? 14.0 : 0.0,
+                              curve: Curves.easeOut,
+                              child: Text(
+                                tab.label,
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 9.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.primary,
+                                  height: 1.4,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                    );
-                  }),
-                ),
-              ],
+                    ),
+                  ),
+                );
+              }),
             ),
-          );
-        },
+          ],
+        ),
       ),
     );
   }

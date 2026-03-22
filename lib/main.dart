@@ -7,7 +7,11 @@ import 'core/services/notification_local_service.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await NotificationLocalService.instance.initialize();
+  try {
+    await NotificationLocalService.instance.initialize();
+  } catch (e) {
+    debugPrint('[Main] Notif init failed (non-fatal): $e');
+  }
 
   NotificationLocalService.instance.onNotificationTap = (payload) {
     if (payload == null) return;
