@@ -1,12 +1,17 @@
+import 'dart:io';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:lottie/lottie.dart';
 import 'package:dio/dio.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/services/api_service.dart';
 import '../../core/utils/app_transitions.dart';
 import 'riwayat_pendaftaran_screen.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class FormPendaftaranScreen extends StatefulWidget {
   const FormPendaftaranScreen({super.key});
@@ -16,6 +21,8 @@ class FormPendaftaranScreen extends StatefulWidget {
 }
 
 class _FormPendaftaranScreenState extends State<FormPendaftaranScreen> {
+  static const _maxFileBytes = 5 * 1024 * 1024;
+
   int _step = 0;
   bool _agreed = false;
   bool _isSubmitting = false;
@@ -42,6 +49,12 @@ class _FormPendaftaranScreenState extends State<FormPendaftaranScreen> {
   final _pkrjIbuCtrl = TextEditingController();
   final _namaWaliCtrl = TextEditingController();
   final _noHpCtrl = TextEditingController();
+
+  File? _dokumenKk;
+  File? _dokumenAkta;
+  File? _dokumenPasFoto;
+
+  final _imagePicker = ImagePicker();
 
   @override
   void initState() {
@@ -96,6 +109,26 @@ class _FormPendaftaranScreenState extends State<FormPendaftaranScreen> {
   }
 
   Future<void> _submit() async {
+    if (_dokumenKk == null || _dokumenAkta == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Kartu Keluarga dan Akta Kelahiran wajib diunggah.',
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+              color: AppColors.white,
+            ),
+          ),
+          backgroundColor: AppColors.danger,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+      );
+      return;
+    }
     if (!_agreed) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -121,32 +154,72 @@ class _FormPendaftaranScreenState extends State<FormPendaftaranScreen> {
       final tgl = _tglLahir != null
           ? '${_tglLahir!.year}-${_tglLahir!.month.toString().padLeft(2, '0')}-${_tglLahir!.day.toString().padLeft(2, '0')}'
           : '';
-      await ApiService.instance.post('/pendaftaran', data: {
+      final formData = FormData.fromMap({
         'nama_anak': _namaAnakCtrl.text.trim(),
         'tempat_lahir': _tempatLahirCtrl.text.trim(),
         'tanggal_lahir': tgl,
         'jenis_kelamin': _jenisKelamin == 'Laki-laki' ? 'L' : 'P',
         'agama': _agama,
-        if (_anakKeCtrl.text.isNotEmpty) 'anak_ke': int.tryParse(_anakKeCtrl.text),
-        if (_asalSekolahCtrl.text.isNotEmpty) 'asal_sekolah': _asalSekolahCtrl.text.trim(),
+        if (_anakKeCtrl.text.isNotEmpty) 'anak_ke': _anakKeCtrl.text.trim(),
+        if (_asalSekolahCtrl.text.isNotEmpty)
+          'asal_sekolah': _asalSekolahCtrl.text.trim(),
         if (_nikCtrl.text.isNotEmpty) 'nik': _nikCtrl.text.trim(),
         if (_noKkCtrl.text.isNotEmpty) 'no_kk': _noKkCtrl.text.trim(),
         'alamat': _alamatCtrl.text.trim(),
         if (_namaAyahCtrl.text.isNotEmpty) 'nama_ayah': _namaAyahCtrl.text.trim(),
-        if (_pkrjAyahCtrl.text.isNotEmpty) 'pekerjaan_ayah': _pkrjAyahCtrl.text.trim(),
+        if (_pkrjAyahCtrl.text.isNotEmpty)
+          'pekerjaan_ayah': _pkrjAyahCtrl.text.trim(),
         if (_namaIbuCtrl.text.isNotEmpty) 'nama_ibu': _namaIbuCtrl.text.trim(),
-        if (_pkrjIbuCtrl.text.isNotEmpty) 'pekerjaan_ibu': _pkrjIbuCtrl.text.trim(),
+        if (_pkrjIbuCtrl.text.isNotEmpty)
+          'pekerjaan_ibu': _pkrjIbuCtrl.text.trim(),
         if (_namaWaliCtrl.text.isNotEmpty) 'nama_wali': _namaWaliCtrl.text.trim(),
         'no_hp': _noHpCtrl.text.trim(),
+        'dokumen_kk': await MultipartFile.fromFile(
+          _dokumenKk!.path,
+          filename: _fileName(_dokumenKk!.path),
+        ),
+        'dokumen_akta': await MultipartFile.fromFile(
+          _dokumenAkta!.path,
+          filename: _fileName(_dokumenAkta!.path),
+        ),
+        if (_dokumenPasFoto != null)
+          'dokumen_pas_foto': await MultipartFile.fromFile(
+            _dokumenPasFoto!.path,
+            filename: _fileName(_dokumenPasFoto!.path),
+          ),
       });
+      final response = await ApiService.instance.post('/pendaftaran', data: formData);
       if (!mounted) return;
       setState(() => _isSubmitting = false);
-      _showSuccessDialog();
+      final body = response.data;
+      String? nomor;
+      String? wa;
+      if (body is Map) {
+        final pendaftaran = body['pendaftaran'];
+        if (pendaftaran is Map) {
+          nomor = pendaftaran['nomor_registrasi']?.toString();
+        }
+        wa = body['whatsapp_sekolah']?.toString();
+      }
+      _showSuccessDialog(
+        nomorRegistrasi: nomor,
+        whatsappUrl: wa,
+      );
     } on DioException catch (e) {
       if (!mounted) return;
       setState(() => _isSubmitting = false);
-      final msg = (e.response?.data as Map?)?['message'] as String? ??
-          'Gagal mengirim pendaftaran. Periksa koneksi Anda.';
+      final data = e.response?.data;
+      String msg = 'Gagal mengirim pendaftaran. Periksa koneksi Anda.';
+      if (data is Map) {
+        msg = data['message']?.toString() ?? msg;
+        final errors = data['errors'];
+        if (errors is Map && errors.isNotEmpty) {
+          final first = errors.values.first;
+          if (first is List && first.isNotEmpty) {
+            msg = first.first.toString();
+          }
+        }
+      }
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(msg, style: GoogleFonts.plusJakartaSans(fontSize: 13)),
         backgroundColor: AppColors.danger,
@@ -154,7 +227,10 @@ class _FormPendaftaranScreenState extends State<FormPendaftaranScreen> {
     }
   }
 
-  void _showSuccessDialog() {
+  void _showSuccessDialog({
+    String? nomorRegistrasi,
+    String? whatsappUrl,
+  }) {
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -192,6 +268,18 @@ class _FormPendaftaranScreenState extends State<FormPendaftaranScreen> {
                   color: AppColors.primary,
                 ),
               ),
+              if (nomorRegistrasi != null && nomorRegistrasi.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Text(
+                  nomorRegistrasi,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.gold,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ],
               const SizedBox(height: 8),
               Text(
                 'Data Anda sedang ditinjau oleh\ntim sekolah.',
@@ -203,41 +291,29 @@ class _FormPendaftaranScreenState extends State<FormPendaftaranScreen> {
                 ),
               ),
               const SizedBox(height: 24),
-              GestureDetector(
+              if (whatsappUrl != null && whatsappUrl.isNotEmpty) ...[
+                _SuccessBtn(
+                  label: 'Hubungi Sekolah (WA)',
+                  color: const Color(0xFF16A34A),
+                  onTap: () async {
+                    final uri = Uri.tryParse(whatsappUrl);
+                    if (uri != null) {
+                      await launchUrl(uri, mode: LaunchMode.externalApplication);
+                    }
+                  },
+                ),
+                const SizedBox(height: 10),
+              ],
+              _SuccessBtn(
+                label: 'Lihat Riwayat Pendaftaran',
+                color: AppColors.primary,
                 onTap: () {
-                  Navigator.pop(context); // tutup dialog
+                  Navigator.pop(context);
                   Navigator.pushReplacement(
                     context,
                     AppRoute(page: const RiwayatPendaftaranScreen()),
                   );
                 },
-                child: Container(
-                  width: double.infinity,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [AppColors.primary, Color(0xFF2D5A9B)],
-                    ),
-                    borderRadius: BorderRadius.circular(14),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.primary.withValues(alpha: 0.3),
-                        blurRadius: 12,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: Center(
-                    child: Text(
-                      'Lihat Riwayat Pendaftaran',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.white,
-                      ),
-                    ),
-                  ),
-                ),
               ),
             ],
           ),
@@ -248,6 +324,59 @@ class _FormPendaftaranScreenState extends State<FormPendaftaranScreen> {
 
   // ── helpers ──────────────────────────────────────────────────────────────────
 
+  String _fileName(String path) {
+    final parts = path.split(Platform.pathSeparator);
+    return parts.isNotEmpty ? parts.last : 'dokumen';
+  }
+
+  String _formatFileSize(int bytes) {
+    if (bytes < 1024) return '$bytes B';
+    if (bytes < 1024 * 1024) {
+      return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    }
+    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+  }
+
+  bool _validateFileSize(File file) {
+    final length = file.lengthSync();
+    if (length > _maxFileBytes) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Ukuran file maksimal 5 MB.',
+            style: GoogleFonts.plusJakartaSans(fontSize: 13),
+          ),
+          backgroundColor: AppColors.danger,
+        ),
+      );
+      return false;
+    }
+    return true;
+  }
+
+  Future<void> _pickDokumenFile(void Function(File?) setFile) async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: const ['pdf', 'jpg', 'jpeg', 'png'],
+    );
+    if (result == null || result.files.single.path == null) return;
+    final file = File(result.files.single.path!);
+    if (!_validateFileSize(file)) return;
+    setState(() => setFile(file));
+  }
+
+  Future<void> _pickPasFoto() async {
+    final picked = await _imagePicker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 2048,
+      imageQuality: 85,
+    );
+    if (picked == null) return;
+    final file = File(picked.path);
+    if (!_validateFileSize(file)) return;
+    setState(() => _dokumenPasFoto = file);
+  }
+
   InputDecoration _fieldDecoration({
     required String label,
     required String hint,
@@ -256,65 +385,175 @@ class _FormPendaftaranScreenState extends State<FormPendaftaranScreen> {
     return InputDecoration(
       labelText: label,
       hintText: hint,
+      floatingLabelBehavior: FloatingLabelBehavior.auto,
       labelStyle: GoogleFonts.plusJakartaSans(
         fontSize: 13,
+        fontWeight: FontWeight.w500,
         color: AppColors.textSecondary,
+      ),
+      floatingLabelStyle: GoogleFonts.plusJakartaSans(
+        fontSize: 13,
+        fontWeight: FontWeight.w700,
+        color: AppColors.primary,
       ),
       hintStyle: GoogleFonts.plusJakartaSans(
         fontSize: 13,
         color: AppColors.textLight,
       ),
-      prefixIcon: Icon(prefixIcon, color: AppColors.textLight, size: 20),
+      prefixIcon: Container(
+        margin: const EdgeInsets.only(left: 10, right: 6),
+        child: Icon(prefixIcon, color: AppColors.primary, size: 20),
+      ),
+      prefixIconConstraints: const BoxConstraints(minWidth: 44),
       filled: true,
-      fillColor: AppColors.inputBg,
+      fillColor: AppColors.white,
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide.none,
+        borderRadius: BorderRadius.circular(14),
+        borderSide: BorderSide(color: AppColors.divider),
       ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide.none,
+        borderRadius: BorderRadius.circular(14),
+        borderSide: BorderSide(color: AppColors.divider),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide:
-            const BorderSide(color: AppColors.primary, width: 1.5),
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: AppColors.primary, width: 1.6),
       ),
       errorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: AppColors.danger, width: 1.5),
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: AppColors.danger, width: 1.4),
       ),
       focusedErrorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: AppColors.danger, width: 1.5),
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: AppColors.danger, width: 1.6),
       ),
       contentPadding:
-          const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
     );
   }
 
   Widget _sectionHeader(String title, IconData icon, Color color) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.06),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withValues(alpha: 0.15)),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, color: color, size: 18),
-          const SizedBox(width: 10),
-          Text(
-            title,
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-              color: color,
+    return Row(
+      children: [
+        Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            gradient: LinearGradient(
+              colors: [
+                color,
+                color.withValues(alpha: 0.75),
+              ],
             ),
+            boxShadow: [
+              BoxShadow(
+                color: color.withValues(alpha: 0.25),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Icon(icon, color: Colors.white, size: 20),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              Text(
+                'Lengkapi data dengan benar',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 11,
+                  color: AppColors.textLight,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _formCard({required List<Widget> children}) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.divider),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withValues(alpha: 0.04),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
           ),
         ],
       ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: children,
+      ),
+    );
+  }
+
+  Widget _choiceChipGroup({
+    required String label,
+    required List<String> options,
+    required String value,
+    required ValueChanged<String> onChanged,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: AppColors.textSecondary,
+          ),
+        ),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: options.map((opt) {
+            final selected = opt == value;
+            return ChoiceChip(
+              label: Text(opt),
+              selected: selected,
+              onSelected: (_) => onChanged(opt),
+              selectedColor: AppColors.primary,
+              backgroundColor: AppColors.inputBg,
+              labelStyle: GoogleFonts.plusJakartaSans(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: selected ? Colors.white : AppColors.textSecondary,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(99),
+                side: BorderSide(
+                  color: selected
+                      ? AppColors.primary
+                      : AppColors.divider,
+                ),
+              ),
+              showCheckmark: false,
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+            );
+          }).toList(),
+        ),
+      ],
     );
   }
 
@@ -385,159 +624,172 @@ class _FormPendaftaranScreenState extends State<FormPendaftaranScreen> {
   }
 
   Widget _buildAppBar() {
-    return SafeArea(
-      bottom: false,
-      child: Container(
-        color: AppColors.white,
-        height: 56,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: Row(
-          children: [
-            GestureDetector(
-              onTap: _prevStep,
-              child: Container(
-                width: 36,
-                height: 36,
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [AppColors.primary, Color(0xFF2A4F7A)],
+        ),
+      ),
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+          child: Row(
+            children: [
+              GestureDetector(
+                onTap: _prevStep,
+                child: Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white.withValues(alpha: 0.14),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.2),
+                    ),
+                  ),
+                  child: const Icon(
+                    Icons.arrow_back_rounded,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Formulir Pendaftaran',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
+                      ),
+                    ),
+                    Text(
+                      'SD Negeri Warialau · Langkah ${_step + 1}/3',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 12,
+                        color: Colors.white.withValues(alpha: 0.75),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: AppColors.primary.withValues(alpha: 0.08),
+                  color: AppColors.gold.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(99),
+                  border: Border.all(
+                    color: AppColors.gold.withValues(alpha: 0.45),
+                  ),
                 ),
-                child: const Icon(
-                  Icons.arrow_back_rounded,
-                  color: AppColors.primary,
-                  size: 20,
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                'Formulir Pendaftaran',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 17,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.primary,
+                child: Text(
+                  '${((_step + 1) / 3 * 100).round()}%',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.gold,
+                  ),
                 ),
               ),
-            ),
-            Text(
-              'SDN Warialau',
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 12,
-                color: AppColors.textSecondary,
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 
   Widget _buildStepper() {
-    const stepTitles = [
-      'Langkah 1',
-      'Langkah 2',
-      'Langkah 3',
-    ];
-    const stepSubtitles = [
-      'Data Anak',
-      'Data Orang Tua',
-      'Konfirmasi',
-    ];
+    const stepSubtitles = ['Data Anak', 'Orang Tua', 'Konfirmasi'];
 
     return Container(
       color: AppColors.white,
-      padding: const EdgeInsets.fromLTRB(24, 12, 24, 16),
+      padding: const EdgeInsets.fromLTRB(20, 14, 20, 14),
       child: Column(
         children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(99),
+            child: LinearProgressIndicator(
+              value: (_step + 1) / 3,
+              minHeight: 6,
+              backgroundColor: AppColors.divider,
+              valueColor:
+                  const AlwaysStoppedAnimation<Color>(AppColors.primary),
+            ),
+          ),
+          const SizedBox(height: 14),
           Row(
             children: List.generate(3, (i) {
               final isDone = i < _step;
               final isCurrent = i == _step;
-
-              Widget circle = Container(
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: isDone
-                      ? AppColors.primary
-                      : isCurrent
-                          ? AppColors.gold
-                          : AppColors.divider,
-                  boxShadow: isCurrent
-                      ? [
-                          BoxShadow(
-                            color: AppColors.gold.withValues(alpha: 0.35),
-                            blurRadius: 10,
-                            offset: const Offset(0, 3),
-                          )
-                        ]
-                      : null,
-                ),
-                child: Center(
-                  child: isDone
-                      ? const Icon(Icons.check_rounded,
-                          color: AppColors.white, size: 16)
-                      : Text(
-                          '${i + 1}',
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
-                            color: isCurrent
-                                ? AppColors.primary
-                                : AppColors.textSecondary,
-                          ),
+              return Expanded(
+                child: Column(
+                  children: [
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 220),
+                      width: 34,
+                      height: 34,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: isDone || isCurrent
+                            ? AppColors.primary
+                            : AppColors.inputBg,
+                        border: Border.all(
+                          color: isDone || isCurrent
+                              ? AppColors.primary
+                              : AppColors.divider,
+                          width: 1.5,
                         ),
+                        boxShadow: isCurrent
+                            ? [
+                                BoxShadow(
+                                  color:
+                                      AppColors.primary.withValues(alpha: 0.3),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 3),
+                                )
+                              ]
+                            : null,
+                      ),
+                      child: Center(
+                        child: isDone
+                            ? const Icon(Icons.check_rounded,
+                                color: Colors.white, size: 16)
+                            : Text(
+                                '${i + 1}',
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w800,
+                                  color: isCurrent
+                                      ? Colors.white
+                                      : AppColors.textSecondary,
+                                ),
+                              ),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      stepSubtitles[i],
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 11,
+                        fontWeight:
+                            isCurrent ? FontWeight.w700 : FontWeight.w500,
+                        color: isCurrent
+                            ? AppColors.primary
+                            : AppColors.textLight,
+                      ),
+                    ),
+                  ],
                 ),
               );
-
-              if (i < 2) {
-                return Expanded(
-                  child: Row(
-                    children: [
-                      circle,
-                      Expanded(
-                        child: Container(
-                          height: 3,
-                          width: 36,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(99),
-                            color: i < _step
-                                ? AppColors.primary
-                                : AppColors.divider,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              }
-              return circle;
             }),
-          ),
-          const SizedBox(height: 10),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                stepTitles[_step],
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.primary,
-                ),
-              ),
-              const SizedBox(width: 6),
-              Text(
-                '\u2014 ${stepSubtitles[_step]}',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 11,
-                  fontStyle: FontStyle.italic,
-                  color: AppColors.textLight,
-                ),
-              ),
-            ],
           ),
         ],
       ),
@@ -551,12 +803,11 @@ class _FormPendaftaranScreenState extends State<FormPendaftaranScreen> {
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
       child: Form(
         key: _s1Key,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: _formCard(
           children: [
             _sectionHeader(
                 'Data Anak', Icons.child_care_rounded, AppColors.primary),
-            const SizedBox(height: 16),
+            const SizedBox(height: 18),
 
             // Nama Lengkap
             Padding(
@@ -620,16 +871,17 @@ class _FormPendaftaranScreenState extends State<FormPendaftaranScreen> {
                         }
                       },
                       child: Container(
-                        height: 54,
+                        height: 56,
                         decoration: BoxDecoration(
-                          color: AppColors.inputBg,
-                          borderRadius: BorderRadius.circular(12),
+                          color: AppColors.white,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: AppColors.divider),
                         ),
                         padding: const EdgeInsets.symmetric(horizontal: 12),
                         child: Row(
                           children: [
                             const Icon(Icons.calendar_month_rounded,
-                                color: AppColors.textLight, size: 20),
+                                color: AppColors.primary, size: 20),
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
@@ -653,50 +905,30 @@ class _FormPendaftaranScreenState extends State<FormPendaftaranScreen> {
               ),
             ),
 
-            // Jenis Kelamin
             Padding(
               padding: const EdgeInsets.only(bottom: 12),
-              child: DropdownButtonFormField<String>(
-                initialValue: _jenisKelamin,
-                decoration: _fieldDecoration(
-                  label: 'Jenis Kelamin',
-                  hint: '',
-                  prefixIcon: Icons.wc_rounded,
-                ),
-                style: GoogleFonts.plusJakartaSans(
-                    fontSize: 14, color: AppColors.textPrimary),
-                dropdownColor: AppColors.white,
-                items: ['Laki-laki', 'Perempuan']
-                    .map((e) => DropdownMenuItem(value: e, child: Text(e)))
-                    .toList(),
-                onChanged: (v) => setState(() => _jenisKelamin = v!),
+              child: _choiceChipGroup(
+                label: 'Jenis Kelamin',
+                options: const ['Laki-laki', 'Perempuan'],
+                value: _jenisKelamin,
+                onChanged: (v) => setState(() => _jenisKelamin = v),
               ),
             ),
 
-            // Agama
             Padding(
               padding: const EdgeInsets.only(bottom: 12),
-              child: DropdownButtonFormField<String>(
-                initialValue: _agama,
-                decoration: _fieldDecoration(
-                  label: 'Agama',
-                  hint: '',
-                  prefixIcon: Icons.church_rounded,
-                ),
-                style: GoogleFonts.plusJakartaSans(
-                    fontSize: 14, color: AppColors.textPrimary),
-                dropdownColor: AppColors.white,
-                items: [
+              child: _choiceChipGroup(
+                label: 'Agama',
+                options: const [
                   'Islam',
                   'Kristen',
                   'Katolik',
                   'Hindu',
                   'Buddha',
                   'Konghucu'
-                ]
-                    .map((e) => DropdownMenuItem(value: e, child: Text(e)))
-                    .toList(),
-                onChanged: (v) => setState(() => _agama = v!),
+                ],
+                value: _agama,
+                onChanged: (v) => setState(() => _agama = v),
               ),
             ),
 
@@ -792,22 +1024,19 @@ class _FormPendaftaranScreenState extends State<FormPendaftaranScreen> {
             ),
 
             // Alamat
-            Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: TextFormField(
-                controller: _alamatCtrl,
-                maxLines: 3,
-                decoration: _fieldDecoration(
-                  label: 'Alamat',
-                  hint: 'Masukkan alamat lengkap',
-                  prefixIcon: Icons.home_rounded,
-                ),
-                style: GoogleFonts.plusJakartaSans(
-                    fontSize: 14, color: AppColors.textPrimary),
-                validator: (v) => (v == null || v.trim().isEmpty)
-                    ? 'Alamat wajib diisi'
-                    : null,
+            TextFormField(
+              controller: _alamatCtrl,
+              maxLines: 3,
+              decoration: _fieldDecoration(
+                label: 'Alamat',
+                hint: 'Masukkan alamat lengkap',
+                prefixIcon: Icons.home_rounded,
               ),
+              style: GoogleFonts.plusJakartaSans(
+                  fontSize: 14, color: AppColors.textPrimary),
+              validator: (v) => (v == null || v.trim().isEmpty)
+                  ? 'Alamat wajib diisi'
+                  : null,
             ),
           ],
         ),
@@ -822,8 +1051,7 @@ class _FormPendaftaranScreenState extends State<FormPendaftaranScreen> {
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
       child: Form(
         key: _s2Key,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: _formCard(
           children: [
             _sectionHeader(
                 'Data Ayah', Icons.person_rounded, AppColors.primary),
@@ -919,27 +1147,24 @@ class _FormPendaftaranScreenState extends State<FormPendaftaranScreen> {
               ),
             ),
 
-            Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: TextFormField(
-                controller: _noHpCtrl,
-                keyboardType: TextInputType.phone,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                decoration: _fieldDecoration(
-                  label: 'No. HP',
-                  hint: 'Nomor aktif yang bisa dihubungi',
-                  prefixIcon: Icons.phone_rounded,
-                ),
-                style: GoogleFonts.plusJakartaSans(
-                    fontSize: 14, color: AppColors.textPrimary),
-                validator: (v) {
-                  if (v == null || v.trim().isEmpty) {
-                    return 'No. HP wajib diisi';
-                  }
-                  if (v.length < 10) return 'No. HP minimal 10 digit';
-                  return null;
-                },
+            TextFormField(
+              controller: _noHpCtrl,
+              keyboardType: TextInputType.phone,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              decoration: _fieldDecoration(
+                label: 'No. HP',
+                hint: 'Nomor aktif yang bisa dihubungi',
+                prefixIcon: Icons.phone_rounded,
               ),
+              style: GoogleFonts.plusJakartaSans(
+                  fontSize: 14, color: AppColors.textPrimary),
+              validator: (v) {
+                if (v == null || v.trim().isEmpty) {
+                  return 'No. HP wajib diisi';
+                }
+                if (v.length < 10) return 'No. HP minimal 10 digit';
+                return null;
+              },
             ),
           ],
         ),
@@ -1174,18 +1399,37 @@ class _FormPendaftaranScreenState extends State<FormPendaftaranScreen> {
                     ],
                   ),
                   const SizedBox(height: 14),
-                  _buildDocItem(
+                  _buildDocumentRow(
+                    label: 'Kartu Keluarga',
+                    required: true,
+                    hint: 'PDF, JPG, atau PNG · maks. 5 MB',
+                    file: _dokumenKk,
                     icon: Icons.picture_as_pdf_rounded,
                     iconColor: AppColors.danger,
-                    name: 'Kartu_Keluarga.pdf',
-                    size: '1.2 MB',
+                    onPick: () => _pickDokumenFile((f) => _dokumenKk = f),
+                    onClear: () => setState(() => _dokumenKk = null),
                   ),
-                  const SizedBox(height: 8),
-                  _buildDocItem(
-                    icon: Icons.image_rounded,
+                  const SizedBox(height: 10),
+                  _buildDocumentRow(
+                    label: 'Akta Kelahiran',
+                    required: true,
+                    hint: 'PDF, JPG, atau PNG · maks. 5 MB',
+                    file: _dokumenAkta,
+                    icon: Icons.description_rounded,
                     iconColor: const Color(0xFF3B82F6),
-                    name: 'Akte_Kelahiran.jpg',
-                    size: '850 KB',
+                    onPick: () => _pickDokumenFile((f) => _dokumenAkta = f),
+                    onClear: () => setState(() => _dokumenAkta = null),
+                  ),
+                  const SizedBox(height: 10),
+                  _buildDocumentRow(
+                    label: 'Pas Foto',
+                    required: false,
+                    hint: 'Opsional · JPG/PNG · maks. 5 MB',
+                    file: _dokumenPasFoto,
+                    icon: Icons.image_rounded,
+                    iconColor: AppColors.primary,
+                    onPick: _pickPasFoto,
+                    onClear: () => setState(() => _dokumenPasFoto = null),
                   ),
                 ],
               ),
@@ -1251,47 +1495,121 @@ class _FormPendaftaranScreenState extends State<FormPendaftaranScreen> {
     );
   }
 
-  Widget _buildDocItem({
+  Widget _buildDocumentRow({
+    required String label,
+    required bool required,
+    required String hint,
+    required File? file,
     required IconData icon,
     required Color iconColor,
-    required String name,
-    required String size,
+    required VoidCallback onPick,
+    required VoidCallback onClear,
   }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: AppColors.backgroundLight,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: AppColors.divider),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, color: iconColor, size: 28),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+    final hasFile = file != null;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text(
+              label,
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            if (required)
+              Text(
+                ' *',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.danger,
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        if (hasFile)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: AppColors.backgroundLight,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: AppColors.primary.withValues(alpha: 0.25)),
+            ),
+            child: Row(
               children: [
-                Text(
-                  name,
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary,
+                Icon(icon, color: iconColor, size: 28),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _fileName(file.path),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      Text(
+                        _formatFileSize(file.lengthSync()),
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 11,
+                          color: AppColors.textLight,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                Text(
-                  size,
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 11,
-                    color: AppColors.textLight,
-                  ),
+                IconButton(
+                  onPressed: onClear,
+                  icon: const Icon(Icons.close_rounded, size: 20),
+                  color: AppColors.textSecondary,
+                  tooltip: 'Hapus',
                 ),
               ],
             ),
+          )
+        else
+          GestureDetector(
+            onTap: onPick,
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+              decoration: BoxDecoration(
+                color: AppColors.backgroundLight,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: AppColors.divider,
+                  style: BorderStyle.solid,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(icon, color: iconColor.withValues(alpha: 0.85), size: 26),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      hint,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ),
+                  const Icon(Icons.upload_file_rounded,
+                      color: AppColors.primary, size: 22),
+                ],
+              ),
+            ),
           ),
-        ],
-      ),
+      ],
     );
   }
 
@@ -1385,6 +1703,50 @@ class _FormPendaftaranScreenState extends State<FormPendaftaranScreen> {
             ),
           ],
         ],
+      ),
+    );
+  }
+}
+
+class _SuccessBtn extends StatelessWidget {
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _SuccessBtn({
+    required this.label,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: double.infinity,
+        height: 48,
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: [
+            BoxShadow(
+              color: color.withValues(alpha: 0.3),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Center(
+          child: Text(
+            label,
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+          ),
+        ),
       ),
     );
   }

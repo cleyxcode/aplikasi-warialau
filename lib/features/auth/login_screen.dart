@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:lottie/lottie.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/services/api_service.dart';
+import '../../core/services/fcm_service.dart';
 import '../../core/services/storage_service.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -115,6 +116,7 @@ class _LoginScreenState extends State<LoginScreen>
       );
       if (!mounted) return;
       await StorageService.saveToken(response.data['token'] as String);
+      await FcmService.instance.registerToken();
       setState(() {
         _isLoading = false;
         _showRocket = true;

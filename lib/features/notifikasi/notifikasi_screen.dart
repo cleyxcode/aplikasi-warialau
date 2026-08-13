@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:lottie/lottie.dart';
 import 'package:shimmer/shimmer.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/services/notification_local_service.dart';
 import 'notifikasi_model.dart';
 import 'notifikasi_service.dart';
 
@@ -123,6 +124,7 @@ class _NotifikasiScreenState extends State<NotifikasiScreen>
 
     try {
       await NotifikasiService.markRead(notif.id);
+      await NotificationLocalService.instance.refreshUnreadBadge();
     } catch (_) {
       // Rollback jika gagal
       if (mounted) {
@@ -143,6 +145,7 @@ class _NotifikasiScreenState extends State<NotifikasiScreen>
     });
     try {
       await NotifikasiService.markAllRead();
+      await NotificationLocalService.instance.refreshUnreadBadge();
     } catch (_) {
       // Silent fail — refresh untuk sync
       await _loadNotifikasi(refresh: true);
@@ -151,6 +154,36 @@ class _NotifikasiScreenState extends State<NotifikasiScreen>
 
   void _removeItem(int id) {
     setState(() => _items.removeWhere((n) => n.id == id));
+  }
+
+  Future<void> _dismissItem(NotifikasiModel notif) async {
+    _removeItem(notif.id);
+    try {
+      await NotifikasiService.delete(notif.id);
+      await NotificationLocalService.instance.refreshUnreadBadge();
+    } catch (_) {
+      // Rollback jika gagal hapus di server
+      if (!mounted) return;
+      await _loadNotifikasi(refresh: true);
+    }
+  }
+
+  Future<void> _swipeMarkRead(NotifikasiModel notif) async {
+    if (notif.dibaca) return;
+    setState(() {
+      final idx = _items.indexWhere((n) => n.id == notif.id);
+      if (idx != -1) _items[idx] = _items[idx].copyWith(dibaca: true);
+    });
+    try {
+      await NotifikasiService.markRead(notif.id);
+      await NotificationLocalService.instance.refreshUnreadBadge();
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        final idx = _items.indexWhere((n) => n.id == notif.id);
+        if (idx != -1) _items[idx] = _items[idx].copyWith(dibaca: false);
+      });
+    }
   }
 
   void _navigateByType(NotifikasiModel notif) {
@@ -413,7 +446,8 @@ class _NotifikasiScreenState extends State<NotifikasiScreen>
               child: _NotifCard(
                 item: notif,
                 onTap: () => _markRead(notif),
-                onDismiss: () => _removeItem(notif.id),
+                onDismiss: () => _dismissItem(notif),
+                onMarkRead: () => _swipeMarkRead(notif),
               ),
             ),
           );
@@ -462,9 +496,13 @@ class _NotifikasiScreenState extends State<NotifikasiScreen>
     );
   }
 
-  // ── Error State (Lottie 404) ──────────────────────────────
+  // ── Error State ───────────────────────────────────────────
 
   Widget _buildErrorState() {
+    final isUnauthorized = _errorMessage.toLowerCase().contains('sesi') ||
+        _errorMessage.toLowerCase().contains('unauthenticated');
+    final isNotFound = _errorMessage.contains('404');
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 32),
@@ -472,14 +510,18 @@ class _NotifikasiScreenState extends State<NotifikasiScreen>
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Lottie.asset(
-              'lib/animations/404.json',
+              isNotFound
+                  ? 'lib/animations/404.json'
+                  : 'lib/animations/empty.json',
               width: 220,
               height: 220,
               repeat: true,
             ),
             const SizedBox(height: 12),
             Text(
-              'Gagal Memuat Notifikasi',
+              isUnauthorized
+                  ? 'Sesi Berakhir'
+                  : 'Gagal Memuat Notifikasi',
               style: GoogleFonts.plusJakartaSans(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
@@ -646,19 +688,32 @@ class _NotifCard extends StatelessWidget {
   final NotifikasiModel item;
   final VoidCallback onTap;
   final VoidCallback onDismiss;
+  final VoidCallback onMarkRead;
 
   const _NotifCard({
     required this.item,
     required this.onTap,
     required this.onDismiss,
+    required this.onMarkRead,
   });
 
   @override
   Widget build(BuildContext context) {
     return Dismissible(
       key: ValueKey(item.id),
-      direction: DismissDirection.endToStart,
+      direction: DismissDirection.horizontal,
       background: Container(
+        alignment: Alignment.centerLeft,
+        padding: const EdgeInsets.only(left: 20),
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        decoration: BoxDecoration(
+          color: AppColors.primary.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: const Icon(Icons.mark_email_read_rounded,
+            color: AppColors.primary, size: 24),
+      ),
+      secondaryBackground: Container(
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: 20),
         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -669,6 +724,13 @@ class _NotifCard extends StatelessWidget {
         child: const Icon(Icons.delete_outline_rounded,
             color: AppColors.danger, size: 24),
       ),
+      confirmDismiss: (direction) async {
+        if (direction == DismissDirection.startToEnd) {
+          onMarkRead();
+          return false; // keep item, only mark read
+        }
+        return true; // allow delete
+      },
       onDismissed: (_) => onDismiss(),
       child: GestureDetector(
         onTap: onTap,

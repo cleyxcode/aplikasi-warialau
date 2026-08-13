@@ -24,15 +24,35 @@ class NotifikasiModel {
 
   factory NotifikasiModel.fromJson(Map<String, dynamic> json) {
     return NotifikasiModel(
-      id: json['id'] as int,
-      userId: json['user_id'] as int,
-      judul: json['judul'] as String,
-      pesan: json['pesan'] as String,
-      tipe: json['tipe'] as String,
-      referensiId: json['referensi_id'] as int?,
-      dibaca: json['dibaca'] as bool,
-      createdAt: DateTime.parse(json['created_at'] as String),
+      id: _asInt(json['id']) ?? 0,
+      userId: _asInt(json['user_id']) ?? 0,
+      judul: (json['judul'] ?? '').toString(),
+      pesan: (json['pesan'] ?? '').toString(),
+      tipe: (json['tipe'] ?? 'umum').toString(),
+      referensiId: _asInt(json['referensi_id']),
+      dibaca: _asBool(json['dibaca']),
+      createdAt: _asDateTime(json['created_at']) ?? DateTime.now(),
     );
+  }
+
+  static int? _asInt(dynamic value) {
+    if (value == null) return null;
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return int.tryParse(value.toString());
+  }
+
+  static bool _asBool(dynamic value) {
+    if (value is bool) return value;
+    if (value is num) return value != 0;
+    final raw = value?.toString().toLowerCase().trim();
+    return raw == '1' || raw == 'true' || raw == 'yes';
+  }
+
+  static DateTime? _asDateTime(dynamic value) {
+    if (value == null) return null;
+    if (value is DateTime) return value;
+    return DateTime.tryParse(value.toString());
   }
 
   NotifikasiModel copyWith({bool? dibaca}) {
@@ -131,16 +151,27 @@ class NotifikasiPaginatedResponse {
   });
 
   factory NotifikasiPaginatedResponse.fromJson(Map<String, dynamic> json) {
+    final rawData = json['data'];
+    final items = rawData is List
+        ? rawData
+            .whereType<Map>()
+            .map((e) => NotifikasiModel.fromJson(Map<String, dynamic>.from(e)))
+            .toList()
+        : <NotifikasiModel>[];
+
+    // Support both classic paginator and JsonResource meta wrapper.
+    final meta = json['meta'] is Map
+        ? Map<String, dynamic>.from(json['meta'] as Map)
+        : <String, dynamic>{};
+
     return NotifikasiPaginatedResponse(
-      data: (json['data'] as List)
-          .map((e) => NotifikasiModel.fromJson(e as Map<String, dynamic>))
-          .toList(),
-      currentPage: json['current_page'] as int,
-      lastPage: json['last_page'] as int,
-      total: json['total'] as int,
-      nextPageUrl: json['next_page_url'] as String?,
+      data: items,
+      currentPage: NotifikasiModel._asInt(json['current_page'] ?? meta['current_page']) ?? 1,
+      lastPage: NotifikasiModel._asInt(json['last_page'] ?? meta['last_page']) ?? 1,
+      total: NotifikasiModel._asInt(json['total'] ?? meta['total']) ?? items.length,
+      nextPageUrl: (json['next_page_url'] ?? meta['next_page_url'])?.toString(),
     );
   }
 
-  bool get hasNextPage => nextPageUrl != null;
+  bool get hasNextPage => nextPageUrl != null && nextPageUrl!.isNotEmpty;
 }

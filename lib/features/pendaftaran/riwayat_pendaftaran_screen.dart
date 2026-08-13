@@ -311,6 +311,12 @@ class _RiwayatPendaftaranScreenState extends State<RiwayatPendaftaranScreen>
           label: 'Ditolak', sub: 'Maaf, pendaftaran Anda tidak dapat diproses',
           chip: 'Ditolak', bgLight: const Color(0xFFFEE2E2), bgDark: const Color(0xFFFFF1F2),
         );
+      case 'perlu_perbaikan':
+        return _StatusConfig(
+          color: const Color(0xFF0284C7), icon: Icons.upload_file_rounded,
+          label: 'Perlu Perbaikan', sub: 'Unggah ulang dokumen sesuai catatan sekolah',
+          chip: 'Perbaiki', bgLight: const Color(0xFFE0F2FE), bgDark: const Color(0xFFF0F9FF),
+        );
       default:
         return _StatusConfig(
           color: const Color(0xFFD97706), icon: Icons.hourglass_top_rounded,
@@ -325,8 +331,11 @@ class _RiwayatPendaftaranScreenState extends State<RiwayatPendaftaranScreen>
   Widget _buildTimeline() {
     final status = _registration?['status'] as String? ?? 'pending';
     final tglDaftar = _fmtDate(_registration?['created_at'] as String?);
+    final catatan = (_registration?['catatan_verifikasi'] as String?)?.trim();
+    final hasCatatan = catatan != null && catatan.isNotEmpty;
     final isDiterima = status == 'diterima';
     final isDitolak = status == 'ditolak';
+    final isPerbaikan = status == 'perlu_perbaikan';
     final isDone = isDiterima || isDitolak;
 
     final steps = [
@@ -337,16 +346,22 @@ class _RiwayatPendaftaranScreenState extends State<RiwayatPendaftaranScreen>
         done: true,
       ),
       _TimelineStep(
-        icon: Icons.find_in_page_rounded,
-        label: 'Sedang Ditinjau',
-        sub: isDone ? 'Selesai ditinjau' : 'Tim sedang memverifikasi',
+        icon: isPerbaikan ? Icons.upload_file_rounded : Icons.find_in_page_rounded,
+        label: isPerbaikan ? 'Perlu Perbaikan' : 'Sedang Ditinjau',
+        sub: isPerbaikan
+            ? (hasCatatan ? catatan! : 'Unggah ulang dokumen')
+            : (isDone ? 'Selesai ditinjau' : 'Tim sedang memverifikasi'),
         done: isDone,
         active: !isDone,
       ),
       _TimelineStep(
         icon: isDiterima ? Icons.how_to_reg_rounded : isDitolak ? Icons.cancel_rounded : Icons.how_to_reg_rounded,
         label: 'Keputusan',
-        sub: isDiterima ? 'Diterima' : isDitolak ? 'Ditolak' : 'Menunggu hasil tinjauan',
+        sub: isDiterima
+            ? (hasCatatan ? catatan! : 'Diterima')
+            : isDitolak
+                ? (hasCatatan ? catatan! : 'Ditolak')
+                : 'Menunggu hasil tinjauan',
         done: isDone,
       ),
     ];

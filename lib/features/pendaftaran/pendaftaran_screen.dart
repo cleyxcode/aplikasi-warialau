@@ -20,6 +20,8 @@ class _PendaftaranScreenState extends State<PendaftaranScreen>
   bool _isLoading = true;
   bool _pendaftaranTutup = false;
   Map<String, dynamic>? _info;
+  List<Map<String, dynamic>> _faqs = [];
+  int? _expandedFaq;
 
   late AnimationController _fadeController;
   late Animation<double> _fadeAnim;
@@ -46,21 +48,39 @@ class _PendaftaranScreenState extends State<PendaftaranScreen>
     _fetchInfo();
   }
 
-  Future<void> _fetchInfo() async {
-    setState(() => _isLoading = true);
+  Future<void> _fetchInfo({bool showLoader = true}) async {
+    if (showLoader) {
+      setState(() => _isLoading = true);
+    }
+
+    Map<String, dynamic>? info;
+    var tutup = false;
+    var faqs = <Map<String, dynamic>>[];
+
     try {
       final resp = await ApiService.instance.get('/info-pendaftaran');
-      setState(() {
-        _info = resp.data as Map<String, dynamic>;
-        _pendaftaranTutup = false;
-        _isLoading = false;
-      });
-      _fadeController.forward();
+      info = resp.data as Map<String, dynamic>;
     } on DioException catch (e) {
-      setState(() {
-        _isLoading = false;
-        _pendaftaranTutup = e.response?.statusCode == 404;
-      });
+      tutup = e.response?.statusCode == 404;
+    }
+
+    try {
+      final faqResp = await ApiService.instance.get('/faq');
+      final faqRaw = (faqResp.data['data'] as List<dynamic>?) ?? [];
+      faqs = faqRaw
+          .whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
+    } catch (_) {}
+
+    if (!mounted) return;
+    setState(() {
+      _info = info;
+      _faqs = faqs;
+      _pendaftaranTutup = tutup;
+      _isLoading = false;
+    });
+    if (!_fadeController.isCompleted) {
       _fadeController.forward();
     }
   }
@@ -124,8 +144,13 @@ class _PendaftaranScreenState extends State<PendaftaranScreen>
         opacity: _fadeAnim,
         child: SlideTransition(
           position: _slideAnim,
-          child: CustomScrollView(
-            physics: const BouncingScrollPhysics(),
+          child: RefreshIndicator(
+            color: AppColors.primary,
+            onRefresh: () => _fetchInfo(showLoader: false),
+            child: CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(
+              parent: BouncingScrollPhysics(),
+            ),
             slivers: [
               SliverAppBar(
                 pinned: true,
@@ -172,82 +197,123 @@ class _PendaftaranScreenState extends State<PendaftaranScreen>
                 ],
               ),
               if (_pendaftaranTutup)
-                SliverFillRemaining(child: _buildTutupState())
+                ..._buildClosedSlivers()
               else
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const SizedBox(height: 16),
-                        _buildHeroCard(),
-                        const SizedBox(height: 16),
-                        _buildInfoCardsRow(),
-                        const SizedBox(height: 16),
-                        _buildSyaratCard(),
-                        const SizedBox(height: 16),
-                        _buildCtaButton(),
-                      ],
-                    ),
-                  ),
-                ),
+                ..._buildOpenSlivers(),
             ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildTutupState() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: AppColors.warning.withValues(alpha: 0.12),
-              ),
-              child: const Icon(Icons.lock_clock_rounded, color: AppColors.warning, size: 40),
-            ),
-            const SizedBox(height: 20),
-            Text(
-              'Pendaftaran Ditutup',
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary,
-              ),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              'Saat ini tidak ada periode pendaftaran yang sedang dibuka. Pantau terus informasi terbaru dari sekolah.',
-              textAlign: TextAlign.center,
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 14,
-                color: AppColors.textSecondary,
-                height: 1.6,
-              ),
-            ),
-            const SizedBox(height: 28),
-            OutlinedButton.icon(
-              onPressed: _fetchInfo,
-              icon: const Icon(Icons.refresh_rounded, size: 18),
-              label: Text('Cek Lagi', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold)),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.primary,
-                side: const BorderSide(color: AppColors.primary),
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-            ),
-          ],
+  List<Widget> _buildClosedSlivers() {
+    return [
+      SliverPadding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
+        sliver: SliverList(
+          delegate: SliverChildListDelegate([
+            const SizedBox(height: 24),
+            _buildTutupState(),
+            if (_faqs.isNotEmpty) ...[
+              const SizedBox(height: 24),
+              _buildFaqSection(),
+            ],
+          ]),
         ),
+      ),
+    ];
+  }
+
+  List<Widget> _buildOpenSlivers() {
+    return [
+      SliverPadding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
+        sliver: SliverList(
+          delegate: SliverChildListDelegate([
+            const SizedBox(height: 16),
+            _buildHeroCard(),
+            const SizedBox(height: 16),
+            _buildInfoCardsRow(),
+            const SizedBox(height: 16),
+            _buildSyaratCard(),
+            if (_faqs.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              _buildFaqSection(),
+            ],
+            const SizedBox(height: 16),
+            _buildCtaButton(),
+          ]),
+        ),
+      ),
+    ];
+  }
+
+  List<String> _parseSyaratItems() {
+    final list = _info?['syarat_list'];
+    if (list is List && list.isNotEmpty) {
+      return list
+          .map((e) => e.toString().trim())
+          .where((s) => s.isNotEmpty)
+          .toList();
+    }
+
+    final syaratRaw = _info?['syarat'] as String? ?? '';
+    return syaratRaw
+        .split(RegExp(r'\r?\n'))
+        .map((s) => s.replaceFirst(RegExp(r'^(\d+[\.\)]\s*|[-•*]\s*)'), '').trim())
+        .where((s) => s.isNotEmpty)
+        .toList();
+  }
+
+  Widget _buildTutupState() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 80,
+            height: 80,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: AppColors.warning.withValues(alpha: 0.12),
+            ),
+            child: const Icon(Icons.lock_clock_rounded, color: AppColors.warning, size: 40),
+          ),
+          const SizedBox(height: 20),
+          Text(
+            'Pendaftaran Ditutup',
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'Saat ini tidak ada periode pendaftaran yang sedang dibuka. Pantau terus informasi terbaru dari sekolah.',
+            textAlign: TextAlign.center,
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 14,
+              color: AppColors.textSecondary,
+              height: 1.6,
+            ),
+          ),
+          const SizedBox(height: 28),
+          OutlinedButton.icon(
+            onPressed: () => _fetchInfo(),
+            icon: const Icon(Icons.refresh_rounded, size: 18),
+            label: Text('Cek Lagi', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold)),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.primary,
+              side: const BorderSide(color: AppColors.primary),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -460,12 +526,7 @@ class _PendaftaranScreenState extends State<PendaftaranScreen>
   }
 
   Widget _buildSyaratCard() {
-    final syaratRaw = _info?['syarat'] as String? ?? '';
-    final items = syaratRaw
-        .split('\n')
-        .map((s) => s.replaceFirst(RegExp(r'^\d+\.\s*'), '').trim())
-        .where((s) => s.isNotEmpty)
-        .toList();
+    final items = _parseSyaratItems();
 
     return Container(
       decoration: BoxDecoration(
@@ -508,39 +569,159 @@ class _PendaftaranScreenState extends State<PendaftaranScreen>
           const Divider(height: 1, thickness: 1, color: AppColors.divider),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-            child: Column(
-              children: items.map((item) {
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        width: 22, height: 22,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: AppColors.gold.withValues(alpha: 0.12),
+            child: items.isEmpty
+                ? Text(
+                    'Belum ada syarat yang ditetapkan. Hubungi sekolah untuk informasi lebih lanjut.',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.textSecondary,
+                      height: 1.5,
+                    ),
+                  )
+                : Column(
+                    children: items.map((item) {
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              width: 22, height: 22,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: AppColors.gold.withValues(alpha: 0.12),
+                              ),
+                              child: const Icon(Icons.check_rounded, color: AppColors.gold, size: 14),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                item,
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                  color: AppColors.textPrimary,
+                                  height: 1.4,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                        child: const Icon(Icons.check_rounded, color: AppColors.gold, size: 14),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          item,
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                            color: AppColors.textPrimary,
-                            height: 1.4,
-                          ),
-                        ),
-                      ),
-                    ],
+                      );
+                    }).toList(),
                   ),
-                );
-              }).toList(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFaqSection() {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.06),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+            child: Row(
+              children: [
+                Container(
+                  width: 4,
+                  height: 20,
+                  decoration: BoxDecoration(
+                    color: AppColors.primary,
+                    borderRadius: BorderRadius.circular(99),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  'Pertanyaan Umum',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ],
             ),
           ),
+          const Divider(height: 1, thickness: 1, color: AppColors.divider),
+          ..._faqs.asMap().entries.map((entry) {
+            final i = entry.key;
+            final faq = entry.value;
+            final open = _expandedFaq == i;
+            final pertanyaan = faq['pertanyaan']?.toString() ?? '';
+            final jawaban = faq['jawaban']?.toString() ?? '';
+            return Column(
+              children: [
+                InkWell(
+                  onTap: () => setState(() {
+                    _expandedFaq = open ? null : i;
+                  }),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            pertanyaan,
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textPrimary,
+                              height: 1.4,
+                            ),
+                          ),
+                        ),
+                        AnimatedRotation(
+                          turns: open ? 0.125 : 0,
+                          duration: const Duration(milliseconds: 200),
+                          child: Icon(
+                            Icons.add_rounded,
+                            size: 20,
+                            color: open ? AppColors.primary : AppColors.textLight,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                AnimatedCrossFade(
+                  firstChild: const SizedBox(width: double.infinity),
+                  secondChild: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+                    child: Text(
+                      jawaban,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 13,
+                        color: AppColors.textSecondary,
+                        height: 1.55,
+                      ),
+                    ),
+                  ),
+                  crossFadeState: open
+                      ? CrossFadeState.showSecond
+                      : CrossFadeState.showFirst,
+                  duration: const Duration(milliseconds: 220),
+                ),
+                if (i != _faqs.length - 1)
+                  const Divider(height: 1, thickness: 1, color: AppColors.divider),
+              ],
+            );
+          }),
         ],
       ),
     );

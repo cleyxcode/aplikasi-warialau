@@ -1,49 +1,64 @@
 import 'dart:async';
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
+import 'package:dio/dio.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:workmanager/workmanager.dart';
 import '../constants/app_colors.dart';
+import '../constants/app_constants.dart';
 import '../../features/notifikasi/notifikasi_model.dart';
 import '../../features/notifikasi/notifikasi_service.dart';
 
-/// Callback saat notifikasi di-tap (harus top-level / static)
+const notifikasiBackgroundTask = 'sd_warialau_notif_poll';
+
 @pragma('vm:entry-point')
 void onNotificationTapBackground(NotificationResponse response) {
-  // Isolate background — tidak ada BuildContext di sini
   debugPrint('[Notif] Background tap: ${response.payload}');
 }
 
-class NotificationLocalService {
+@pragma('vm:entry-point')
+void notificationBackgroundDispatcher() {
+  Workmanager().executeTask((task, inputData) async {
+    try {
+      await NotificationLocalService.instance.initialize();
+      await NotificationLocalService.instance.checkForNewNotifications(
+        fromBackground: true,
+      );
+      return Future.value(true);
+    } catch (e) {
+      debugPrint('[Notif] Background task error: $e');
+      return Future.value(false);
+    }
+  });
+}
+
+class NotificationLocalService with WidgetsBindingObserver {
   NotificationLocalService._();
   static final NotificationLocalService instance = NotificationLocalService._();
 
   final FlutterLocalNotificationsPlugin _plugin =
       FlutterLocalNotificationsPlugin();
 
-  // Channel Android
   static const _channelId = 'sd_warialau_channel';
   static const _channelName = 'SD Negeri Warialau';
   static const _channelDesc = 'Notifikasi dari SD Negeri Warialau';
-
-  // SharedPreferences key untuk menyimpan ID notif yang sudah ditampilkan
   static const _prefShownKey = 'local_notif_shown_ids';
 
   Timer? _pollTimer;
-  int _lastUnreadCount = 0;
+  int _lastUnreadCount = -1;
   bool _initialized = false;
+  bool _observingLifecycle = false;
+  bool _backgroundRegistered = false;
 
-  /// Callback saat notifikasi di-tap (ketika app sedang berjalan)
-  /// Diisi dari main.dart / navigator key
+  final ValueNotifier<int> unreadCount = ValueNotifier<int>(0);
+
   void Function(String? payload)? onNotificationTap;
-
-  // ── Inisialisasi ─────────────────────────────────────────
 
   Future<void> initialize() async {
     if (_initialized) return;
 
-    const androidSettings =
-        AndroidInitializationSettings('ic_notification');
+    const androidSettings = AndroidInitializationSettings('ic_notification');
     const linuxSettings =
         LinuxInitializationSettings(defaultActionName: 'Buka');
     const initSettings = InitializationSettings(
@@ -54,17 +69,13 @@ class NotificationLocalService {
     await _plugin.initialize(
       settings: initSettings,
       onDidReceiveNotificationResponse: (response) {
-        debugPrint('[Notif] Tap payload: ${response.payload}');
         onNotificationTap?.call(response.payload);
       },
       onDidReceiveBackgroundNotificationResponse: onNotificationTapBackground,
     );
 
-    // Buat channel Android (wajib Android 8+)
     await _createAndroidChannel();
-
     _initialized = true;
-    debugPrint('[Notif] Initialized');
   }
 
   Future<void> _createAndroidChannel() async {
@@ -82,17 +93,12 @@ class NotificationLocalService {
         ?.createNotificationChannel(androidChannel);
   }
 
-  // ── Request Permission (Android 13+) ──────────────────────
-
   Future<bool> requestPermission() async {
     final android = _plugin.resolvePlatformSpecificImplementation<
         AndroidFlutterLocalNotificationsPlugin>();
     final granted = await android?.requestNotificationsPermission();
-    debugPrint('[Notif] Permission granted: $granted');
     return granted ?? false;
   }
-
-  // ── Tampilkan Notifikasi ──────────────────────────────────
 
   Future<void> showNotification({
     required int id,
@@ -100,7 +106,7 @@ class NotificationLocalService {
     required String body,
     String? payload,
   }) async {
-    const androidDetails = AndroidNotificationDetails(
+    final androidDetails = AndroidNotificationDetails(
       _channelId,
       _channelName,
       channelDescription: _channelDesc,
@@ -110,9 +116,9 @@ class NotificationLocalService {
       color: AppColors.primary,
       enableVibration: true,
       ticker: 'SD Negeri Warialau',
-      styleInformation: BigTextStyleInformation(''),
+      styleInformation: BigTextStyleInformation(body, contentTitle: title),
     );
-    const details = NotificationDetails(android: androidDetails);
+    final details = NotificationDetails(android: androidDetails);
     await _plugin.show(
       id: id,
       title: title,
@@ -120,7 +126,16 @@ class NotificationLocalService {
       notificationDetails: details,
       payload: payload,
     );
-    debugPrint('[Notif] Shown: $title');
+  }
+
+  Future<void> showSimple(String title, String body, [String? payloadJson]) async {
+    final id = DateTime.now().millisecondsSinceEpoch.remainder(100000);
+    await showNotification(
+      id: id,
+      title: title,
+      body: body,
+      payload: payloadJson,
+    );
   }
 
   Future<void> showFromModel(NotifikasiModel notif) async {
@@ -137,47 +152,82 @@ class NotificationLocalService {
     );
   }
 
-  // ── Polling dari API ──────────────────────────────────────
-
-  /// Mulai polling setiap [intervalSeconds] detik.
-  /// Panggil setelah user login.
   void startPolling({int intervalSeconds = 30}) {
     stopPolling();
-    // Langsung cek pertama kali
-    _checkForNewNotifications();
+    _ensureLifecycleObserver();
+    checkForNewNotifications();
     _pollTimer = Timer.periodic(
       Duration(seconds: intervalSeconds),
-      (_) => _checkForNewNotifications(),
+      (_) => checkForNewNotifications(),
     );
-    debugPrint('[Notif] Polling started (${intervalSeconds}s interval)');
+    _registerBackgroundTask();
   }
 
   void stopPolling() {
     _pollTimer?.cancel();
     _pollTimer = null;
-    debugPrint('[Notif] Polling stopped');
   }
 
-  Future<void> _checkForNewNotifications() async {
+  void _ensureLifecycleObserver() {
+    if (_observingLifecycle) return;
+    WidgetsBinding.instance.addObserver(this);
+    _observingLifecycle = true;
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      checkForNewNotifications();
+    }
+  }
+
+  Future<void> _registerBackgroundTask() async {
+    if (_backgroundRegistered) return;
     try {
-      final unread = await NotifikasiService.getUnreadCount();
-      debugPrint('[Notif] Unread count: $unread');
+      await Workmanager().initialize(notificationBackgroundDispatcher);
+      await Workmanager().registerPeriodicTask(
+        notifikasiBackgroundTask,
+        notifikasiBackgroundTask,
+        frequency: const Duration(minutes: 15),
+        existingWorkPolicy: ExistingWorkPolicy.keep,
+        constraints: Constraints(networkType: NetworkType.connected),
+        backoffPolicy: BackoffPolicy.linear,
+        backoffPolicyDelay: const Duration(minutes: 5),
+      );
+      _backgroundRegistered = true;
+    } catch (e) {
+      debugPrint('[Notif] Workmanager register failed: $e');
+    }
+  }
 
-      if (unread == 0) return;
+  Future<void> checkForNewNotifications({bool fromBackground = false}) async {
+    try {
+      final unread = fromBackground
+          ? await _fetchUnreadCountBackground()
+          : await NotifikasiService.getUnreadCount();
 
-      // Hanya fetch jika ada notif baru (count naik atau pertama kali)
-      if (unread <= _lastUnreadCount && _lastUnreadCount != 0) return;
+      unreadCount.value = unread;
+
+      if (unread == 0) {
+        _lastUnreadCount = 0;
+        return;
+      }
+
+      final shouldFetch =
+          unread > _lastUnreadCount || _lastUnreadCount < 0 || fromBackground;
       _lastUnreadCount = unread;
+      if (!shouldFetch) return;
 
-      // Fetch halaman pertama notifikasi
-      final result = await NotifikasiService.getNotifikasi(page: 1);
+      final List<NotifikasiModel> items = fromBackground
+          ? await _fetchNotifikasiBackground()
+          : (await NotifikasiService.getNotifikasi(page: 1)).data;
+
       final shownIds = await _getShownIds();
 
-      for (final notif in result.data) {
+      for (final notif in items) {
         if (!notif.dibaca && !shownIds.contains(notif.id)) {
           await showFromModel(notif);
           shownIds.add(notif.id);
-          // Delay antar notifikasi agar tidak tumpuk
           await Future.delayed(const Duration(milliseconds: 300));
         }
       }
@@ -188,17 +238,72 @@ class NotificationLocalService {
     }
   }
 
-  // ── Reset (saat logout) ───────────────────────────────────
+  Future<int> _fetchUnreadCountBackground() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('auth_token');
+    if (token == null || token.isEmpty) return 0;
+
+    final dio = Dio(BaseOptions(
+      baseUrl: AppConstants.baseUrl,
+      headers: {
+        'Accept': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+      connectTimeout: const Duration(seconds: 12),
+      receiveTimeout: const Duration(seconds: 12),
+    ));
+    final response = await dio.get('/notifikasi/unread-count');
+    final data = response.data;
+    if (data is! Map) return 0;
+    final unread = data['unread'];
+    if (unread is int) return unread;
+    if (unread is num) return unread.toInt();
+    return int.tryParse(unread?.toString() ?? '') ?? 0;
+  }
+
+  Future<List<NotifikasiModel>> _fetchNotifikasiBackground() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('auth_token');
+    if (token == null || token.isEmpty) return [];
+
+    final dio = Dio(BaseOptions(
+      baseUrl: AppConstants.baseUrl,
+      headers: {
+        'Accept': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+      connectTimeout: const Duration(seconds: 12),
+      receiveTimeout: const Duration(seconds: 12),
+    ));
+    final response = await dio.get(
+      '/notifikasi',
+      queryParameters: {'page': 1},
+    );
+    final data = (response.data as Map<String, dynamic>)['data'] as List? ?? [];
+    return data
+        .map((e) => NotifikasiModel.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<void> refreshUnreadBadge() async {
+    try {
+      final unread = await NotifikasiService.getUnreadCount();
+      unreadCount.value = unread;
+      _lastUnreadCount = unread;
+    } catch (_) {}
+  }
 
   Future<void> resetOnLogout() async {
     stopPolling();
-    _lastUnreadCount = 0;
+    _lastUnreadCount = -1;
+    unreadCount.value = 0;
     await _saveShownIds([]);
     await _plugin.cancelAll();
-    debugPrint('[Notif] Reset on logout');
+    try {
+      await Workmanager().cancelByUniqueName(notifikasiBackgroundTask);
+    } catch (_) {}
+    _backgroundRegistered = false;
   }
-
-  // ── SharedPreferences helpers ─────────────────────────────
 
   Future<List<int>> _getShownIds() async {
     final prefs = await SharedPreferences.getInstance();

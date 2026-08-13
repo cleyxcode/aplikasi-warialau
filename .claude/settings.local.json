@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__filesystem-flutter__directory_tree",
+      "Bash(flutter pub get)",
+      "Read(//opt/**)",
+      "Bash(/home/code/flutter/bin/flutter pub get)",
+      "Bash(flutter analyze lib/features/profil_sekolah/profil_sekolah_screen.dart lib/features/pendaftaran/ lib/features/berita/berita_model.dart lib/features/galeri/galeri_model.dart)",
+      "Bash(grep -v \"^$\")"
+    ]
+  }
+}

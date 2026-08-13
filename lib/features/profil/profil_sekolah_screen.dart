@@ -3,31 +3,64 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:dio/dio.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/constants/app_constants.dart';
 import '../../core/services/api_service.dart';
+import '../../core/widgets/school_map_card.dart';
 import '../guru/guru_screen.dart';
 
+class _Milestone {
+  final String tahun;
+  final String deskripsi;
+  const _Milestone({required this.tahun, required this.deskripsi});
+}
+
 class _SekolahData {
+  final String namaSekolah;
+  final String? logo;
   final String kepalaSekolah;
   final String akreditasi;
   final String tahunBerdiri;
   final int jumlahRuangKelas;
   final String visi;
   final List<String> misiList;
+  final String tujuan;
   final String sejarah;
+  final List<_Milestone> tonggakSejarah;
   final String alamat;
   final String kontak;
+  final String? emailSekolah;
+  final String? jamOperasional;
+  final String? latitude;
+  final String? longitude;
+  final String? mapsUrl;
+  final String? mapsEmbed;
+  final String? facebookUrl;
+  final String? instagramUrl;
 
   const _SekolahData({
+    required this.namaSekolah,
+    this.logo,
     required this.kepalaSekolah,
     required this.akreditasi,
     required this.tahunBerdiri,
     required this.jumlahRuangKelas,
     required this.visi,
     required this.misiList,
+    required this.tujuan,
     required this.sejarah,
+    required this.tonggakSejarah,
     required this.alamat,
     required this.kontak,
+    this.emailSekolah,
+    this.jamOperasional,
+    this.latitude,
+    this.longitude,
+    this.mapsUrl,
+    this.mapsEmbed,
+    this.facebookUrl,
+    this.instagramUrl,
   });
 
   factory _SekolahData.fromJson(Map<String, dynamic> j) {
@@ -37,17 +70,51 @@ class _SekolahData {
         .map((s) => s.replaceFirst(RegExp(r'^\d+\.\s*'), '').trim())
         .where((s) => s.isNotEmpty)
         .toList();
+    final tonggakRaw = (j['tonggak_sejarah'] as List<dynamic>?) ?? [];
+    final tonggak = tonggakRaw.map((e) {
+      final m = e as Map<String, dynamic>;
+      return _Milestone(
+        tahun: m['tahun']?.toString() ?? '',
+        deskripsi: m['deskripsi'] as String? ?? '',
+      );
+    }).where((m) => m.tahun.isNotEmpty && m.deskripsi.isNotEmpty).toList();
+
     return _SekolahData(
-      kepalaSekolah: j['kepala_sekolah'] as String? ?? '-',
-      akreditasi: j['akreditasi'] as String? ?? 'B',
-      tahunBerdiri: j['tahun_berdiri'] as String? ?? '-',
+      namaSekolah: j['nama_sekolah'] as String? ?? 'SD Negeri Warialau',
+      logo: j['logo'] as String?,
+      kepalaSekolah: j['kepala_sekolah'] as String? ?? '—',
+      akreditasi: j['akreditasi'] as String? ?? '—',
+      tahunBerdiri: j['tahun_berdiri'] as String? ?? '—',
       jumlahRuangKelas: (j['jumlah_ruang_kelas'] as num?)?.toInt() ?? 0,
       visi: j['visi'] as String? ?? '',
       misiList: misiLines,
+      tujuan: j['tujuan'] as String? ?? '',
       sejarah: j['sejarah'] as String? ?? '',
-      alamat: j['alamat'] as String? ?? '-',
-      kontak: j['kontak'] as String? ?? '-',
+      tonggakSejarah: tonggak,
+      alamat: j['alamat'] as String? ?? '',
+      kontak: j['kontak'] as String? ?? '',
+      emailSekolah: j['email_sekolah'] as String?,
+      jamOperasional: j['jam_operasional'] as String?,
+      latitude: j['latitude']?.toString(),
+      longitude: j['longitude']?.toString(),
+      mapsUrl: j['maps_url'] as String?,
+      mapsEmbed: j['maps_embed'] as String?,
+      facebookUrl: j['facebook_url'] as String?,
+      instagramUrl: j['instagram_url'] as String?,
     );
+  }
+
+  String get logoUrl => AppConstants.imageUrl(logo);
+
+  String? get resolvedMapsUrl {
+    if (mapsUrl != null && mapsUrl!.isNotEmpty) return mapsUrl;
+    if (latitude != null &&
+        longitude != null &&
+        latitude!.isNotEmpty &&
+        longitude!.isNotEmpty) {
+      return 'https://www.google.com/maps?q=$latitude,$longitude';
+    }
+    return null;
   }
 }
 
@@ -62,7 +129,8 @@ class _ProfilSekolahScreenState extends State<ProfilSekolahScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   _SekolahData? _data;
-  bool _isLoading = false;
+  bool _isLoading = true;
+  bool _hasError = false;
 
   static const _tabs = ['Profil', 'Visi Misi', 'Sejarah', 'Kontak'];
 
@@ -70,20 +138,39 @@ class _ProfilSekolahScreenState extends State<ProfilSekolahScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: _tabs.length, vsync: this);
-    _tabController.addListener(() => setState(() {}));
+    _tabController.addListener(() {
+      if (!_tabController.indexIsChanging) setState(() {});
+    });
     _fetchProfil();
   }
 
   Future<void> _fetchProfil() async {
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _hasError = false;
+    });
     try {
       final resp = await ApiService.instance.get('/profil-sekolah');
-      setState(() {
-        _data = _SekolahData.fromJson(resp.data as Map<String, dynamic>);
-        _isLoading = false;
-      });
+      if (!mounted) return;
+      final raw = resp.data;
+      if (raw is Map<String, dynamic>) {
+        setState(() {
+          _data = _SekolahData.fromJson(raw);
+          _isLoading = false;
+          _hasError = false;
+        });
+      } else {
+        setState(() {
+          _isLoading = false;
+          _hasError = _data == null;
+        });
+      }
     } on DioException {
-      setState(() => _isLoading = false);
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _hasError = _data == null;
+      });
     }
   }
 
@@ -97,30 +184,90 @@ class _ProfilSekolahScreenState extends State<ProfilSekolahScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.backgroundLight,
-      body: NestedScrollView(
-        headerSliverBuilder: (_, __) => [
-          SliverToBoxAdapter(child: _buildHeader()),
-          SliverToBoxAdapter(child: _buildStatsRow()),
-          SliverPersistentHeader(
-            pinned: true,
-            delegate: _TabBarDelegate(
-              tabController: _tabController,
-              tabs: _tabs,
+      body: RefreshIndicator(
+        color: AppColors.primary,
+        onRefresh: _fetchProfil,
+        child: NestedScrollView(
+          physics: const AlwaysScrollableScrollPhysics(
+            parent: BouncingScrollPhysics(),
+          ),
+          headerSliverBuilder: (_, __) => [
+            SliverToBoxAdapter(child: _buildHeader()),
+            SliverToBoxAdapter(child: _buildStatsRow()),
+            SliverPersistentHeader(
+              pinned: true,
+              delegate: _TabBarDelegate(
+                tabController: _tabController,
+                tabs: _tabs,
+              ),
+            ),
+          ],
+          body: _isLoading
+              ? _buildShimmerBody()
+              : _hasError
+                  ? _buildErrorBody()
+                  : TabBarView(
+                      controller: _tabController,
+                      children: [
+                        _ProfilTab(data: _data),
+                        _VisiMisiTab(data: _data),
+                        _SejarahTab(data: _data),
+                        _KontakTab(data: _data),
+                      ],
+                    ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildErrorBody() {
+    final navBarHeight = 64.0 + 12.0 + MediaQuery.of(context).padding.bottom;
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: EdgeInsets.fromLTRB(24, 48, 24, navBarHeight + 24),
+      children: [
+        Icon(Icons.cloud_off_rounded,
+            size: 56, color: AppColors.textLight.withValues(alpha: 0.7)),
+        const SizedBox(height: 16),
+        Text(
+          'Gagal memuat profil',
+          textAlign: TextAlign.center,
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: AppColors.textPrimary,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Periksa koneksi internet lalu coba lagi.',
+          textAlign: TextAlign.center,
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 13,
+            color: AppColors.textSecondary,
+            height: 1.5,
+          ),
+        ),
+        const SizedBox(height: 24),
+        Center(
+          child: FilledButton.icon(
+            onPressed: _fetchProfil,
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: AppColors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+            ),
+            icon: const Icon(Icons.refresh_rounded, size: 18),
+            label: Text(
+              'Coba Lagi',
+              style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold),
             ),
           ),
-        ],
-        body: _isLoading
-            ? _buildShimmerBody()
-            : TabBarView(
-                controller: _tabController,
-                children: [
-                  _ProfilTab(data: _data),
-                  _VisiMisiTab(data: _data),
-                  _SejarahTab(data: _data),
-                  _KontakTab(data: _data),
-                ],
-              ),
-      ),
+        ),
+      ],
     );
   }
 
@@ -291,6 +438,10 @@ class _ProfilSekolahScreenState extends State<ProfilSekolahScreen>
   // ── Header ────────────────────────────────────────────────
 
   Widget _buildHeader() {
+    final nama = _data?.namaSekolah ?? 'SD Negeri Warialau';
+    final logoUrl = _data?.logoUrl ?? '';
+    final akreditasi = _data?.akreditasi;
+
     return Container(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
@@ -304,7 +455,6 @@ class _ProfilSekolahScreenState extends State<ProfilSekolahScreen>
         bottom: false,
         child: Stack(
           children: [
-            // Decorative circles
             Positioned(
               right: -40,
               top: 0,
@@ -330,30 +480,48 @@ class _ProfilSekolahScreenState extends State<ProfilSekolahScreen>
               ),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 36),
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 36),
               child: Column(
                 children: [
-                  // Top bar
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      _HeaderIconBtn(
-                        icon: Icons.arrow_back_rounded,
-                        onTap: () => Navigator.maybePop(context),
-                      ),
-                      Text(
-                        'Profil Sekolah',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 17,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.white,
+                  // Title row — root tab: no back button
+                  SizedBox(
+                    height: 44,
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'Profil Sekolah',
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 17,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.white,
+                            ),
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 40),
-                    ],
+                        Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            onTap: _isLoading ? null : _fetchProfil,
+                            borderRadius: BorderRadius.circular(22),
+                            child: Ink(
+                              width: 44,
+                              height: 44,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: Colors.white.withValues(alpha: 0.12),
+                              ),
+                              child: Icon(
+                                Icons.refresh_rounded,
+                                color: AppColors.white.withValues(alpha: 0.9),
+                                size: 20,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                  const SizedBox(height: 24),
-                  // Logo dengan shimmer placeholder
+                  const SizedBox(height: 16),
                   Container(
                     padding: const EdgeInsets.all(4),
                     decoration: BoxDecoration(
@@ -373,71 +541,84 @@ class _ProfilSekolahScreenState extends State<ProfilSekolahScreen>
                       ],
                     ),
                     child: ClipOval(
-                      child: CachedNetworkImage(
-                        imageUrl:
-                            'https://lh3.googleusercontent.com/aida-public/AB6AXuBIl6kDPv_b3UxLFZeMY2JzBi6CcZCq0qSDPih_0X8jy0BwHOWqc2jSjuFxHcxl15V2bvAvRbzC6z6J5YhJR1cNKt_ofiLp24zoFDjz3lwrR41kPsuBBdVPl_ejeRZn1JT5_aO96j1e7M-IG1pDcDX-mTKdhEZRnN6w_4EAm7mUZaY0FVIewedxBH9-ALzFLP_eB8htcKSnsRdXXMjVwg9IvNipK1aa-BAl5QWis36vgGsu5ZhRcGSE9b5rsuHCnOTydDqXWHswbKv5',
-                        width: 100,
-                        height: 100,
-                        fit: BoxFit.cover,
-                        // ── Shimmer untuk logo saat loading ──
-                        placeholder: (_, __) => Shimmer.fromColors(
-                          baseColor: const Color(0xFFE0E6EF),
-                          highlightColor: const Color(0xFFF2F5F9),
-                          child: Container(
-                            width: 100,
-                            height: 100,
-                            color: Colors.white,
-                          ),
-                        ),
-                        errorWidget: (_, __, ___) => Container(
-                          width: 100,
-                          height: 100,
-                          color: AppColors.inputBg,
-                          child: const Icon(
-                            Icons.school_rounded,
-                            size: 48,
-                            color: AppColors.primary,
-                          ),
-                        ),
-                      ),
+                      child: logoUrl.isNotEmpty
+                          ? CachedNetworkImage(
+                              imageUrl: logoUrl,
+                              width: 88,
+                              height: 88,
+                              fit: BoxFit.cover,
+                              placeholder: (_, __) => Shimmer.fromColors(
+                                baseColor: const Color(0xFFE0E6EF),
+                                highlightColor: const Color(0xFFF2F5F9),
+                                child: Container(
+                                  width: 88,
+                                  height: 88,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              errorWidget: (_, __, ___) =>
+                                  _logoFallback(),
+                            )
+                          : _logoFallback(),
                     ),
                   ),
-                  const SizedBox(height: 14),
-                  Text(
-                    'SD Negeri Warialau',
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.white,
-                      letterSpacing: -0.3,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(999),
-                    ),
+                  const SizedBox(height: 12),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
                     child: Text(
-                      'NPSN: 12345678',
+                      nama,
+                      textAlign: TextAlign.center,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                       style: GoogleFonts.plusJakartaSans(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white.withValues(alpha: 0.85),
-                        letterSpacing: 0.8,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.white,
+                        letterSpacing: -0.3,
+                        height: 1.25,
                       ),
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  if (akreditasi != null && akreditasi.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 5,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.gold.withValues(alpha: 0.18),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        'Akreditasi $akreditasi',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.gold,
+                        ),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 4),
                 ],
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _logoFallback() {
+    return Container(
+      width: 88,
+      height: 88,
+      color: AppColors.inputBg,
+      child: const Icon(
+        Icons.school_rounded,
+        size: 42,
+        color: AppColors.primary,
       ),
     );
   }
@@ -453,13 +634,13 @@ class _ProfilSekolahScreenState extends State<ProfilSekolahScreen>
             ? Row(
                 children: List.generate(3, (i) {
                   final spacer = i < 2
-                      ? const SizedBox(width: 10)
+                      ? const SizedBox(width: 8)
                       : const SizedBox.shrink();
                   return [
                     Expanded(
                       child: _ShimmerWrap(
                         child: Container(
-                          height: 100,
+                          height: 96,
                           decoration: BoxDecoration(
                             color: Colors.white,
                             borderRadius: BorderRadius.circular(16),
@@ -476,19 +657,19 @@ class _ProfilSekolahScreenState extends State<ProfilSekolahScreen>
                   _StatCard(
                     icon: Icons.verified_rounded,
                     label: 'Akreditasi',
-                    value: _data?.akreditasi ?? 'A',
+                    value: _data?.akreditasi ?? '—',
                   ),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: 8),
                   _StatCard(
                     icon: Icons.calendar_today_rounded,
                     label: 'Berdiri',
-                    value: _data?.tahunBerdiri ?? '1985',
+                    value: _data?.tahunBerdiri ?? '—',
                   ),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: 8),
                   _StatCard(
                     icon: Icons.meeting_room_rounded,
                     label: 'Kelas',
-                    value: _data != null ? '${_data!.jumlahRuangKelas}' : '12',
+                    value: _data != null ? '${_data!.jumlahRuangKelas}' : '—',
                   ),
                 ],
               ),
@@ -533,32 +714,40 @@ class _TabBarDelegate extends SliverPersistentHeaderDelegate {
     double shrinkOffset,
     bool overlapsContent,
   ) {
-    return Container(
+    return Material(
       color: AppColors.backgroundLight,
-      child: Column(
-        children: [
-          TabBar(
-            controller: tabController,
-            isScrollable: true,
-            tabAlignment: TabAlignment.start,
-            labelStyle: GoogleFonts.plusJakartaSans(
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-            ),
-            unselectedLabelStyle: GoogleFonts.plusJakartaSans(
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-            ),
-            labelColor: AppColors.primary,
-            unselectedLabelColor: AppColors.textLight,
-            indicatorColor: AppColors.primary,
-            indicatorWeight: 3,
-            indicatorSize: TabBarIndicatorSize.label,
-            dividerColor: AppColors.divider,
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            tabs: tabs.map((t) => Tab(text: t)).toList(),
-          ),
-        ],
+      elevation: overlapsContent ? 1 : 0,
+      shadowColor: Colors.black26,
+      child: TabBar(
+        controller: tabController,
+        isScrollable: false,
+        labelStyle: GoogleFonts.plusJakartaSans(
+          fontSize: 13,
+          fontWeight: FontWeight.bold,
+        ),
+        unselectedLabelStyle: GoogleFonts.plusJakartaSans(
+          fontSize: 13,
+          fontWeight: FontWeight.w500,
+        ),
+        labelColor: AppColors.primary,
+        unselectedLabelColor: AppColors.textLight,
+        indicatorColor: AppColors.primary,
+        indicatorWeight: 3,
+        indicatorSize: TabBarIndicatorSize.label,
+        dividerColor: AppColors.divider,
+        labelPadding: EdgeInsets.zero,
+        tabs: tabs
+            .map(
+              (t) => Tab(
+                height: 46,
+                child: Text(
+                  t,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            )
+            .toList(),
       ),
     );
   }
@@ -585,7 +774,7 @@ class _StatCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 6),
         decoration: BoxDecoration(
           color: AppColors.white,
           borderRadius: BorderRadius.circular(16),
@@ -613,49 +802,27 @@ class _StatCard extends StatelessWidget {
             Text(
               label,
               style: GoogleFonts.plusJakartaSans(
-                fontSize: 9,
-                fontWeight: FontWeight.w700,
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
                 color: AppColors.textSecondary,
-                letterSpacing: 0.8,
               ),
               textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
             const SizedBox(height: 4),
             Text(
               value,
               style: GoogleFonts.plusJakartaSans(
-                fontSize: 20,
+                fontSize: 18,
                 fontWeight: FontWeight.bold,
                 color: AppColors.primary,
               ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-// ── Header Icon Button ────────────────────────────────────────────────────────
-
-class _HeaderIconBtn extends StatelessWidget {
-  final IconData icon;
-  final VoidCallback onTap;
-
-  const _HeaderIconBtn({required this.icon, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 40,
-        height: 40,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: Colors.white.withValues(alpha: 0.12),
-        ),
-        child: Icon(icon, color: AppColors.white, size: 22),
       ),
     );
   }
@@ -671,7 +838,9 @@ class _ProfilTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final navBarHeight = 52.0 + 14.0 + MediaQuery.of(context).padding.bottom;
+    final navBarHeight = 64.0 + 12.0 + MediaQuery.of(context).padding.bottom;
+    final nama = data?.namaSekolah ?? 'SD Negeri Warialau';
+
     return ListView(
       padding: EdgeInsets.fromLTRB(16, 0, 16, navBarHeight + 24),
       children: [
@@ -681,60 +850,56 @@ class _ProfilTab extends StatelessWidget {
         _InfoCard(
           children: [
             _InfoRow(
+              icon: Icons.apartment_rounded,
+              label: 'Nama Sekolah',
+              value: nama,
+            ),
+            const _Divider(),
+            _InfoRow(
               icon: Icons.person_rounded,
               label: 'Kepala Sekolah',
-              value: data?.kepalaSekolah ?? 'Drs. Haji Ahmad',
+              value: data?.kepalaSekolah ?? '—',
             ),
-            const _Divider(),
-            _InfoRow(
-              icon: Icons.school_rounded,
-              label: 'Status Sekolah',
-              value: 'Negeri (SDN)',
-            ),
-            const _Divider(),
-            _InfoRow(
-              icon: Icons.location_city_rounded,
-              label: 'Kabupaten',
-              value: 'Kepulauan Aru',
-            ),
-            const _Divider(),
-            _InfoRow(
-              icon: Icons.flag_rounded,
-              label: 'Provinsi',
-              value: 'Maluku',
-            ),
+            if (data?.alamat.isNotEmpty == true) ...[
+              const _Divider(),
+              _InfoRow(
+                icon: Icons.location_on_rounded,
+                label: 'Alamat',
+                value: data!.alamat,
+              ),
+            ],
           ],
         ),
         const SizedBox(height: 20),
-        _SectionTitle('Data Sekolah'),
+        _SectionTitle('Ringkasan'),
         const SizedBox(height: 12),
         _InfoCard(
           children: [
-            _InfoRow(icon: Icons.tag_rounded, label: 'NPSN', value: '12345678'),
-            const _Divider(),
             _InfoRow(
-              icon: Icons.badge_rounded,
-              label: 'NSS',
-              value: '101217102001',
+              icon: Icons.verified_rounded,
+              label: 'Akreditasi',
+              value: data?.akreditasi ?? '—',
             ),
             const _Divider(),
             _InfoRow(
-              icon: Icons.group_rounded,
-              label: 'Total Siswa',
-              value: '384 Siswa',
+              icon: Icons.calendar_month_rounded,
+              label: 'Tahun Berdiri',
+              value: data?.tahunBerdiri ?? '—',
             ),
             const _Divider(),
             _InfoRow(
-              icon: Icons.people_alt_rounded,
-              label: 'Total Guru',
-              value: '24 Guru',
+              icon: Icons.meeting_room_rounded,
+              label: 'Ruang Kelas',
+              value: data != null
+                  ? '${data!.jumlahRuangKelas} Ruang'
+                  : '—',
             ),
           ],
         ),
         const SizedBox(height: 20),
         // Akreditasi badge
         Container(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
             gradient: const LinearGradient(
               begin: Alignment.topLeft,
@@ -753,8 +918,8 @@ class _ProfilTab extends StatelessWidget {
           child: Row(
             children: [
               Container(
-                width: 60,
-                height: 60,
+                width: 56,
+                height: 56,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: AppColors.gold,
@@ -767,24 +932,24 @@ class _ProfilTab extends StatelessWidget {
                 ),
                 child: Center(
                   child: Text(
-                    data?.akreditasi ?? 'A',
+                    data?.akreditasi ?? '—',
                     style: GoogleFonts.plusJakartaSans(
-                      fontSize: 28,
+                      fontSize: 24,
                       fontWeight: FontWeight.bold,
                       color: AppColors.primary,
                     ),
                   ),
                 ),
               ),
-              const SizedBox(width: 16),
+              const SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Terakreditasi ${data?.akreditasi ?? 'A'}',
+                      'Terakreditasi ${data?.akreditasi ?? '—'}',
                       style: GoogleFonts.plusJakartaSans(
-                        fontSize: 16,
+                        fontSize: 15,
                         fontWeight: FontWeight.bold,
                         color: AppColors.white,
                       ),
@@ -795,6 +960,7 @@ class _ProfilTab extends StatelessWidget {
                       style: GoogleFonts.plusJakartaSans(
                         fontSize: 12,
                         color: Colors.white.withValues(alpha: 0.75),
+                        height: 1.35,
                       ),
                     ),
                   ],
@@ -803,96 +969,80 @@ class _ProfilTab extends StatelessWidget {
               const Icon(
                 Icons.verified_rounded,
                 color: AppColors.gold,
-                size: 28,
+                size: 26,
               ),
             ],
           ),
         ),
         const SizedBox(height: 20),
-        // ── Menu Daftar Guru ──────────────────────────────
         _SectionTitle('Tenaga Pengajar'),
         const SizedBox(height: 12),
-        GestureDetector(
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const GuruScreen()),
-          ),
-          child: Container(
-            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
-            decoration: BoxDecoration(
-              color: AppColors.white,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.05),
-                  blurRadius: 10,
-                  offset: const Offset(0, 3),
-                ),
-              ],
+        Material(
+          color: AppColors.white,
+          borderRadius: BorderRadius.circular(16),
+          child: InkWell(
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const GuruScreen()),
             ),
-            child: Row(
-              children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: AppColors.primary.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(16),
+            child: Ink(
+              padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.05),
+                    blurRadius: 10,
+                    offset: const Offset(0, 3),
                   ),
-                  child: const Icon(
-                    Icons.groups_rounded,
-                    color: AppColors.primary,
+                ],
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: AppColors.primary.withValues(alpha: 0.08),
+                    ),
+                    child: const Icon(
+                      Icons.groups_rounded,
+                      color: AppColors.primary,
+                      size: 22,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Daftar Guru',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        Text(
+                          'Lihat semua guru aktif',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 12,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Icon(
+                    Icons.chevron_right_rounded,
+                    color: AppColors.textLight,
                     size: 22,
                   ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Daftar Guru',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
-                      Text(
-                        'Lihat semua guru aktif',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 12,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 10, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: AppColors.gold.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        'Lihat',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.gold,
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      const Icon(Icons.chevron_right_rounded,
-                          color: AppColors.gold, size: 16),
-                    ],
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -911,7 +1061,11 @@ class _VisiMisiTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final navBarHeight = 52.0 + 14.0 + MediaQuery.of(context).padding.bottom;
+    final navBarHeight = 64.0 + 12.0 + MediaQuery.of(context).padding.bottom;
+    final visi = data?.visi.trim() ?? '';
+    final misiList = data?.misiList ?? const <String>[];
+    final tujuan = data?.tujuan.trim() ?? '';
+
     return ListView(
       padding: EdgeInsets.fromLTRB(16, 4, 16, navBarHeight + 24),
       children: [
@@ -961,14 +1115,16 @@ class _VisiMisiTab extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               Text(
-                data?.visi.isNotEmpty == true
-                    ? '"${data!.visi}"'
-                    : '"Mewujudkan generasi yang berakhlak mulia, cerdas, terampil, dan peduli lingkungan berdasarkan iman dan taqwa."',
+                visi.isNotEmpty
+                    ? '"$visi"'
+                    : 'Visi belum diatur di panel admin.',
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: 14,
-                  fontStyle: FontStyle.italic,
+                  fontStyle: visi.isNotEmpty ? FontStyle.italic : FontStyle.normal,
                   height: 1.7,
-                  color: AppColors.textPrimary,
+                  color: visi.isNotEmpty
+                      ? AppColors.textPrimary
+                      : AppColors.textSecondary,
                 ),
               ),
             ],
@@ -1020,90 +1176,89 @@ class _VisiMisiTab extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 16),
-              ...(data?.misiList.isNotEmpty == true
-                      ? data!.misiList
-                      : _misiList)
-                  .asMap()
-                  .entries
-                  .map((e) {
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Container(
-                            width: 26,
-                            height: 26,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: AppColors.gold.withValues(alpha: 0.15),
-                            ),
-                            child: Center(
-                              child: Text(
-                                '${e.key + 1}',
-                                style: GoogleFonts.plusJakartaSans(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppColors.gold,
-                                ),
-                              ),
-                            ),
+              if (misiList.isEmpty)
+                Text(
+                  'Misi belum diatur di panel admin.',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 14,
+                    height: 1.6,
+                    color: AppColors.textSecondary,
+                  ),
+                )
+              else
+                ...misiList.asMap().entries.map((e) {
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          width: 26,
+                          height: 26,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: AppColors.gold.withValues(alpha: 0.15),
                           ),
-                          const SizedBox(width: 12),
-                          Expanded(
+                          child: Center(
                             child: Text(
-                              e.value,
+                              '${e.key + 1}',
                               style: GoogleFonts.plusJakartaSans(
-                                fontSize: 14,
-                                height: 1.6,
-                                color: AppColors.textPrimary,
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.gold,
                               ),
                             ),
                           ),
-                        ],
-                      ),
-                    );
-                  }),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            e.value,
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 14,
+                              height: 1.6,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }),
             ],
           ),
         ),
-        const SizedBox(height: 20),
-        _SectionTitle('Tujuan Sekolah'),
-        const SizedBox(height: 12),
-        Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                AppColors.primary.withValues(alpha: 0.05),
-                AppColors.gold.withValues(alpha: 0.05),
-              ],
+        if (tujuan.isNotEmpty) ...[
+          const SizedBox(height: 20),
+          _SectionTitle('Tujuan Sekolah'),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  AppColors.primary.withValues(alpha: 0.05),
+                  AppColors.gold.withValues(alpha: 0.05),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppColors.divider),
             ),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppColors.divider),
-          ),
-          child: Text(
-            'Menghasilkan peserta didik yang berkarakter, berprestasi, dan mampu bersaing di era global dengan tetap menjunjung nilai-nilai budaya lokal Maluku.',
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 14,
-              height: 1.7,
-              color: AppColors.textPrimary,
+            child: Text(
+              tujuan,
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 14,
+                height: 1.7,
+                color: AppColors.textPrimary,
+              ),
             ),
           ),
-        ),
+        ],
       ],
     );
   }
-
-  static const _misiList = [
-    'Meningkatkan kualitas pembelajaran berbasis teknologi.',
-    'Menanamkan nilai karakter melalui pembiasaan harian.',
-    'Menumbuhkan budaya literasi dan numerasi di lingkungan sekolah.',
-    'Membangun kemitraan yang kuat antara sekolah, orang tua, dan masyarakat.',
-    'Mengembangkan potensi seni dan budaya lokal siswa.',
-  ];
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1116,7 +1271,10 @@ class _SejarahTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final navBarHeight = 52.0 + 14.0 + MediaQuery.of(context).padding.bottom;
+    final navBarHeight = 64.0 + 12.0 + MediaQuery.of(context).padding.bottom;
+    final sejarah = data?.sejarah.trim() ?? '';
+    final milestones = data?.tonggakSejarah ?? const <_Milestone>[];
+
     return ListView(
       padding: EdgeInsets.fromLTRB(16, 4, 16, navBarHeight + 24),
       children: [
@@ -1136,38 +1294,33 @@ class _SejarahTab extends StatelessWidget {
             ],
           ),
           child: Text(
-            data?.sejarah.isNotEmpty == true
-                ? data!.sejarah
-                : 'SD Negeri Warialau didirikan pada tahun 1985 sebagai respons atas kebutuhan pendidikan dasar bagi warga sekitar. Awalnya hanya memiliki 3 ruang kelas sederhana dengan fasilitas yang sangat terbatas.\n\nSeiring berjalannya waktu, sekolah ini terus berkembang pesat dalam aspek infrastruktur dan prestasi akademik maupun non-akademik di tingkat provinsi. Dukungan penuh dari pemerintah daerah dan masyarakat setempat menjadi pendorong utama kemajuan sekolah.\n\nHingga saat ini, SD Negeri Warialau telah memiliki 12 ruang kelas yang representatif, laboratorium komputer, perpustakaan, dan berbagai fasilitas penunjang lainnya untuk mendukung proses pembelajaran yang berkualitas.',
+            sejarah.isNotEmpty
+                ? sejarah
+                : 'Sejarah sekolah belum diatur di panel admin.',
             style: GoogleFonts.plusJakartaSans(
               fontSize: 14,
               height: 1.8,
-              color: AppColors.textPrimary,
+              color: sejarah.isNotEmpty
+                  ? AppColors.textPrimary
+                  : AppColors.textSecondary,
             ),
           ),
         ),
-        const SizedBox(height: 20),
-        _SectionTitle('Tonggak Sejarah'),
-        const SizedBox(height: 16),
-        ..._milestones.map(
-          (m) => _MilestoneItem(
-            year: m.$1,
-            desc: m.$2,
-            isLast: m == _milestones.last,
+        if (milestones.isNotEmpty) ...[
+          const SizedBox(height: 20),
+          _SectionTitle('Tonggak Sejarah'),
+          const SizedBox(height: 16),
+          ...milestones.asMap().entries.map(
+            (e) => _MilestoneItem(
+              year: e.value.tahun,
+              desc: e.value.deskripsi,
+              isLast: e.key == milestones.length - 1,
+            ),
           ),
-        ),
+        ],
       ],
     );
   }
-
-  static const _milestones = [
-    ('1985', 'Pendirian SD Negeri Warialau dengan 3 ruang kelas pertama.'),
-    ('1993', 'Pembangunan gedung tambahan dan penambahan tenaga pengajar.'),
-    ('2002', 'Peraihan akreditasi B dari BAN-S/M untuk pertama kalinya.'),
-    ('2010', 'Renovasi total gedung sekolah dengan dukungan APBD daerah.'),
-    ('2018', 'Peraihan akreditasi A, tertinggi dalam sejarah sekolah.'),
-    ('2024', 'Pengembangan laboratorium komputer berbasis teknologi terkini.'),
-  ];
 }
 
 class _MilestoneItem extends StatelessWidget {
@@ -1267,148 +1420,107 @@ class _KontakTab extends StatelessWidget {
   final _SekolahData? data;
   const _KontakTab({this.data});
 
+  Future<void> _launch(String? url) async {
+    if (url == null || url.isEmpty) return;
+    final uri = Uri.tryParse(url);
+    if (uri == null) return;
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
+  Future<void> _launchTel(String? phone) async {
+    if (phone == null || phone.isEmpty || phone == '-') return;
+    final cleaned = phone.replaceAll(RegExp(r'[^\d+]'), '');
+    if (cleaned.isEmpty) return;
+    await _launch('tel:$cleaned');
+  }
+
+  Future<void> _launchMail(String? email) async {
+    if (email == null || email.isEmpty) return;
+    await _launch('mailto:$email');
+  }
+
   @override
   Widget build(BuildContext context) {
-    final navBarHeight = 52.0 + 14.0 + MediaQuery.of(context).padding.bottom;
+    final navBarHeight = 64.0 + 12.0 + MediaQuery.of(context).padding.bottom;
+    final alamat = data?.alamat.trim() ?? '';
+    final kontak = data?.kontak.trim() ?? '';
+    final email = data?.emailSekolah?.trim() ?? '';
+    final jam = data?.jamOperasional?.trim() ?? '';
+    final sekolahNama = data?.namaSekolah ?? 'SD Negeri Warialau';
+
+    final contactChildren = <Widget>[];
+    void addRow(Widget row) {
+      if (contactChildren.isNotEmpty) contactChildren.add(const _Divider());
+      contactChildren.add(row);
+    }
+
+    if (alamat.isNotEmpty) {
+      addRow(_ContactRow(
+        icon: Icons.location_on_rounded,
+        iconColor: AppColors.danger,
+        label: 'Alamat',
+        value: alamat,
+      ));
+    }
+    if (kontak.isNotEmpty) {
+      addRow(_ContactRow(
+        icon: Icons.call_rounded,
+        iconColor: AppColors.success,
+        label: 'Telepon',
+        value: kontak,
+        onTap: () => _launchTel(kontak),
+      ));
+    }
+    if (email.isNotEmpty) {
+      addRow(_ContactRow(
+        icon: Icons.mail_rounded,
+        iconColor: AppColors.primary,
+        label: 'Email',
+        value: email,
+        onTap: () => _launchMail(email),
+      ));
+    }
+    if (jam.isNotEmpty) {
+      addRow(_ContactRow(
+        icon: Icons.access_time_rounded,
+        iconColor: AppColors.warning,
+        label: 'Jam Operasional',
+        value: jam,
+      ));
+    }
+
     return ListView(
       padding: EdgeInsets.fromLTRB(16, 4, 16, navBarHeight + 24),
       children: [
         _SectionTitle('Hubungi Kami'),
         const SizedBox(height: 12),
-        _InfoCard(
-          children: [
-            _ContactRow(
-              icon: Icons.location_on_rounded,
-              iconColor: AppColors.danger,
-              label: 'Alamat',
-              value: data?.alamat.isNotEmpty == true
-                  ? data!.alamat
-                  : 'Jl. Pendidikan No. 45, Warialau, Kab. Kepulauan Aru, Maluku',
+        if (contactChildren.isEmpty)
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: AppColors.white,
+              borderRadius: BorderRadius.circular(16),
             ),
-            const _Divider(),
-            _ContactRow(
-              icon: Icons.call_rounded,
-              iconColor: AppColors.success,
-              label: 'Telepon',
-              value: data?.kontak.isNotEmpty == true
-                  ? data!.kontak
-                  : '(0911) 123456',
+            child: Text(
+              'Kontak sekolah belum diatur di panel admin.',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 14,
+                color: AppColors.textSecondary,
+              ),
             ),
-            const _Divider(),
-            _ContactRow(
-              icon: Icons.mail_rounded,
-              iconColor: AppColors.primary,
-              label: 'Email',
-              value: 'sdnwarialau@sch.id',
-            ),
-            const _Divider(),
-            _ContactRow(
-              icon: Icons.access_time_rounded,
-              iconColor: AppColors.warning,
-              label: 'Jam Operasional',
-              value: 'Senin–Jumat, 07.00–14.00 WIT',
-            ),
-          ],
-        ),
+          )
+        else
+          _InfoCard(children: contactChildren),
         const SizedBox(height: 20),
         _SectionTitle('Lokasi'),
         const SizedBox(height: 12),
-        Container(
-          height: 180,
-          decoration: BoxDecoration(
-            color: const Color(0xFFE8EEF7),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppColors.divider),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.06),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Stack(
-            children: [
-              CustomPaint(painter: _MapGridPainter(), size: Size.infinite),
-              Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: AppColors.primary,
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppColors.primary.withValues(alpha: 0.4),
-                            blurRadius: 16,
-                          ),
-                        ],
-                      ),
-                      child: const Icon(
-                        Icons.location_on_rounded,
-                        color: AppColors.white,
-                        size: 28,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Warialau, Maluku',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.primary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Positioned(
-                bottom: 12,
-                right: 12,
-                child: GestureDetector(
-                  onTap: () {},
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary,
-                      borderRadius: BorderRadius.circular(10),
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppColors.primary.withValues(alpha: 0.35),
-                          blurRadius: 8,
-                          offset: const Offset(0, 3),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Icons.map_rounded,
-                          color: AppColors.white,
-                          size: 14,
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          'Buka Peta',
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.white,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
+        SchoolMapCard(
+          latitude: data?.latitude,
+          longitude: data?.longitude,
+          mapsUrl: data?.resolvedMapsUrl,
+          mapsEmbed: data?.mapsEmbed,
+          title: sekolahNama,
+          height: 200,
         ),
         const SizedBox(height: 20),
         _SectionTitle('Media Sosial'),
@@ -1419,18 +1531,26 @@ class _KontakTab extends StatelessWidget {
               icon: Icons.facebook_rounded,
               label: 'Facebook',
               color: const Color(0xFF1877F2),
+              onTap: data?.facebookUrl != null && data!.facebookUrl!.isNotEmpty
+                  ? () => _launch(data!.facebookUrl)
+                  : null,
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: 8),
             _SocialBtn(
-              icon: Icons.public_rounded,
-              label: 'Website',
-              color: AppColors.primary,
+              icon: Icons.camera_alt_rounded,
+              label: 'Instagram',
+              color: const Color(0xFFE4405F),
+              onTap: data?.instagramUrl != null &&
+                      data!.instagramUrl!.isNotEmpty
+                  ? () => _launch(data!.instagramUrl)
+                  : null,
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: 8),
             _SocialBtn(
               icon: Icons.mail_rounded,
               label: 'Email',
               color: AppColors.gold,
+              onTap: email.isNotEmpty ? () => _launchMail(email) : null,
             ),
           ],
         ),
@@ -1443,38 +1563,55 @@ class _SocialBtn extends StatelessWidget {
   final IconData icon;
   final String label;
   final Color color;
+  final VoidCallback? onTap;
 
   const _SocialBtn({
     required this.icon,
     required this.label,
     required this.color,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
+    final enabled = onTap != null;
     return Expanded(
-      child: GestureDetector(
-        onTap: () {},
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 14),
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.08),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: color.withValues(alpha: 0.2)),
-          ),
-          child: Column(
-            children: [
-              Icon(icon, color: color, size: 24),
-              const SizedBox(height: 6),
-              Text(
-                label,
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: color,
-                ),
+      child: Material(
+        color: color.withValues(alpha: enabled ? 0.08 : 0.04),
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(14),
+          child: Container(
+            constraints: const BoxConstraints(minHeight: 72),
+            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: color.withValues(alpha: enabled ? 0.2 : 0.1),
               ),
-            ],
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  icon,
+                  color: enabled ? color : color.withValues(alpha: 0.4),
+                  size: 22,
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: enabled ? color : color.withValues(alpha: 0.45),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -1482,27 +1619,6 @@ class _SocialBtn extends StatelessWidget {
   }
 }
 
-class _MapGridPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = const Color(0xFFB8CCE8).withValues(alpha: 0.5)
-      ..strokeWidth = 1;
-
-    const step = 24.0;
-    for (double x = 0; x < size.width; x += step) {
-      canvas.drawLine(Offset(x, 0), Offset(x, size.height), paint);
-    }
-    for (double y = 0; y < size.height; y += step) {
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
 // Shared Widgets
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -1565,6 +1681,7 @@ class _InfoRow extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
             width: 42,
@@ -1595,6 +1712,7 @@ class _InfoRow extends StatelessWidget {
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
                     color: AppColors.textPrimary,
+                    height: 1.35,
                   ),
                 ),
               ],
@@ -1611,17 +1729,19 @@ class _ContactRow extends StatelessWidget {
   final Color iconColor;
   final String label;
   final String value;
+  final VoidCallback? onTap;
 
   const _ContactRow({
     required this.icon,
     required this.iconColor,
     required this.label,
     required this.value,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
+    final child = Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1654,15 +1774,37 @@ class _ContactRow extends StatelessWidget {
                   style: GoogleFonts.plusJakartaSans(
                     fontSize: 13,
                     fontWeight: FontWeight.w500,
-                    color: AppColors.textPrimary,
+                    color: onTap != null
+                        ? AppColors.primary
+                        : AppColors.textPrimary,
                     height: 1.5,
+                    decoration: onTap != null
+                        ? TextDecoration.underline
+                        : TextDecoration.none,
+                    decorationColor:
+                        AppColors.primary.withValues(alpha: 0.35),
                   ),
                 ),
               ],
             ),
           ),
+          if (onTap != null)
+            const Padding(
+              padding: EdgeInsets.only(top: 8),
+              child: Icon(
+                Icons.open_in_new_rounded,
+                size: 16,
+                color: AppColors.textLight,
+              ),
+            ),
         ],
       ),
+    );
+
+    if (onTap == null) return child;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(onTap: onTap, child: child),
     );
   }
 }

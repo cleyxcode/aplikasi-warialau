@@ -13,15 +13,36 @@ class NotifikasiService {
       '/notifikasi',
       queryParameters: {'page': page},
     );
+    final data = response.data;
+    if (data is! Map) {
+      throw DioException(
+        requestOptions: response.requestOptions,
+        response: response,
+        message: 'Format respons notifikasi tidak valid.',
+        type: DioExceptionType.badResponse,
+      );
+    }
     return NotifikasiPaginatedResponse.fromJson(
-      response.data as Map<String, dynamic>,
+      Map<String, dynamic>.from(data),
     );
   }
 
   /// GET /api/v1/notifikasi/unread-count — Jumlah belum dibaca
   static Future<int> getUnreadCount() async {
     final response = await _dio.get('/notifikasi/unread-count');
-    return (response.data as Map<String, dynamic>)['unread'] as int;
+    final data = response.data;
+    if (data is! Map) return 0;
+    return _asInt(
+          Map<String, dynamic>.from(data)['unread'],
+        ) ??
+        0;
+  }
+
+  static int? _asInt(dynamic value) {
+    if (value == null) return null;
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return int.tryParse(value.toString());
   }
 
   /// PATCH /api/v1/notifikasi/{id}/baca — Tandai satu notifikasi dibaca
@@ -34,11 +55,33 @@ class NotifikasiService {
     await _dio.patch('/notifikasi/baca-semua');
   }
 
-  /// Helper: cek apakah error adalah DioException
+  /// DELETE /api/v1/notifikasi/{id} — Hapus notifikasi
+  static Future<void> delete(int id) async {
+    await _dio.delete('/notifikasi/$id');
+  }
+
+  /// Helper: pesan error yang lebih jelas (termasuk HTTP status).
   static String errorMessage(dynamic error) {
     if (error is DioException) {
-      final msg = error.response?.data?['message'];
-      if (msg != null) return msg.toString();
+      final status = error.response?.statusCode;
+      final msg = error.response?.data is Map
+          ? (error.response!.data as Map)['message']
+          : null;
+      if (msg != null && msg.toString().trim().isNotEmpty) {
+        return msg.toString();
+      }
+      if (status == 401) {
+        return 'Sesi berakhir. Silakan masuk kembali.';
+      }
+      if (status == 404) {
+        return 'Endpoint notifikasi tidak ditemukan (404).';
+      }
+      if (status == 429) {
+        return 'Terlalu banyak permintaan. Coba lagi sebentar.';
+      }
+      if (status != null && status >= 500) {
+        return 'Server sedang bermasalah. Coba lagi nanti.';
+      }
       switch (error.type) {
         case DioExceptionType.connectionTimeout:
         case DioExceptionType.receiveTimeout:

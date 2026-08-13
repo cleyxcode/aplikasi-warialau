@@ -1,38 +1,29 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'app/app.dart';
-import 'app/app_routes.dart';
+import 'core/services/fcm_service.dart';
+import 'core/services/notification_deep_link.dart';
 import 'core/services/notification_local_service.dart';
+import 'core/services/sentry_service.dart';
 
-void main() async {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  try {
-    await NotificationLocalService.instance.initialize();
-  } catch (e) {
-    debugPrint('[Main] Notif init failed (non-fatal): $e');
-  }
-
-  NotificationLocalService.instance.onNotificationTap = (payload) {
-    if (payload == null) return;
+  await SentryService.init(() async {
     try {
-      final data   = jsonDecode(payload) as Map<String, dynamic>;
-      final tipe   = data['tipe'] as String?;
-      final refId  = data['referensi_id'];
-      final nav    = navigatorKey.currentState;
-      if (nav == null) return;
-
-      if (tipe == 'berita' && refId != null) {
-        nav.pushNamed(AppRoutes.detailBerita, arguments: refId);
-      } else if (tipe == 'pendaftaran' && refId != null) {
-        nav.pushNamed(AppRoutes.detailPendaftaran, arguments: refId);
-      } else {
-        nav.pushNamed(AppRoutes.notifikasi);
-      }
-    } catch (_) {
-      navigatorKey.currentState?.pushNamed(AppRoutes.notifikasi);
+      await NotificationLocalService.instance.initialize();
+    } catch (e) {
+      debugPrint('[Main] Notif init failed (non-fatal): $e');
     }
-  };
 
-  runApp(const App());
+    try {
+      await FcmService.instance.initialize();
+    } catch (e) {
+      debugPrint('[Main] FCM init failed (non-fatal): $e');
+    }
+
+    NotificationLocalService.instance.onNotificationTap =
+        NotificationDeepLink.instance.handlePayload;
+
+    runApp(const App());
+  });
 }

@@ -6,6 +6,7 @@ import 'package:shimmer/shimmer.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/services/api_service.dart';
+import '../../core/services/notification_local_service.dart';
 import '../../core/utils/app_transitions.dart';
 import '../profil/profil_user_screen.dart';
 import '../notifikasi/notifikasi_screen.dart';
@@ -396,46 +397,74 @@ class _HomeScreenState extends State<HomeScreen>
       actions: [
         Padding(
           padding: const EdgeInsets.only(right: 16),
-          child: GestureDetector(
-            onTap: () => Navigator.push(
-              context,
-              AppRoute(page: const NotifikasiScreen()),
-            ),
-            child: Stack(
-              clipBehavior: Clip.none,
-              children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.white.withValues(alpha: 0.12),
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.15),
-                      width: 1,
+          child: ValueListenableBuilder<int>(
+            valueListenable: NotificationLocalService.instance.unreadCount,
+            builder: (context, unread, _) {
+              final hasUnread = unread > 0;
+              return GestureDetector(
+                onTap: () async {
+                  await Navigator.push(
+                    context,
+                    AppRoute(page: const NotifikasiScreen()),
+                  );
+                  await NotificationLocalService.instance.refreshUnreadBadge();
+                },
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 220),
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: hasUnread
+                            ? AppColors.gold.withValues(alpha: 0.22)
+                            : Colors.white.withValues(alpha: 0.12),
+                        border: Border.all(
+                          color: hasUnread
+                              ? AppColors.gold.withValues(alpha: 0.65)
+                              : Colors.white.withValues(alpha: 0.15),
+                          width: 1,
+                        ),
+                      ),
+                      child: Icon(
+                        hasUnread
+                            ? Icons.notifications_active_rounded
+                            : Icons.notifications_outlined,
+                        color: hasUnread ? AppColors.gold : AppColors.white,
+                        size: 22,
+                      ),
                     ),
-                  ),
-                  child: const Icon(
-                    Icons.notifications_outlined,
-                    color: AppColors.white,
-                    size: 22,
-                  ),
+                    if (hasUnread)
+                      Positioned(
+                        top: 4,
+                        right: 4,
+                        child: Container(
+                          constraints: const BoxConstraints(minWidth: 16),
+                          height: 16,
+                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                          decoration: BoxDecoration(
+                            color: AppColors.gold,
+                            borderRadius: BorderRadius.circular(99),
+                            border: Border.all(color: AppColors.white, width: 1.5),
+                          ),
+                          alignment: Alignment.center,
+                          child: Text(
+                            unread > 9 ? '9+' : '$unread',
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 9,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.primary,
+                              height: 1,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
-                Positioned(
-                  top: 8,
-                  right: 8,
-                  child: Container(
-                    width: 9,
-                    height: 9,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: AppColors.gold,
-                      border: Border.all(color: AppColors.white, width: 1.5),
-                    ),
-                  ),
-                ),
-              ],
-            ),
+              );
+            },
           ),
         ),
       ],
@@ -448,9 +477,7 @@ class _HomeScreenState extends State<HomeScreen>
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
       child: GestureDetector(
-        onTap: () {
-          // TODO: Navigate to search screen or open search delegate
-        },
+        onTap: _goToBerita,
         child: Container(
           width: double.infinity,
           height: 52,
@@ -511,19 +538,16 @@ class _HomeScreenState extends State<HomeScreen>
       _QuickActionData(
         icon: Icons.newspaper_rounded,
         label: 'Berita',
-        gradientColors: const [Color(0xFF3B82F6), Color(0xFF1D4ED8)],
         onTap: _goToBerita,
       ),
       _QuickActionData(
         icon: Icons.photo_library_rounded,
         label: 'Galeri',
-        gradientColors: const [Color(0xFF22C55E), Color(0xFF15803D)],
         onTap: _goToGaleri,
       ),
       _QuickActionData(
         icon: Icons.people_rounded,
         label: 'Guru',
-        gradientColors: const [Color(0xFF8B5CF6), Color(0xFF6D28D9)],
         onTap: () => Navigator.push(
           context,
           AppRoute(page: const GuruScreen()),
@@ -532,7 +556,6 @@ class _HomeScreenState extends State<HomeScreen>
       _QuickActionData(
         icon: Icons.assignment_rounded,
         label: 'Daftar',
-        gradientColors: const [AppColors.gold, Color(0xFFB8860B)],
         onTap: _goToPendaftaran,
       ),
     ];
@@ -1066,13 +1089,11 @@ class _ShimmerWrap extends StatelessWidget {
 class _QuickActionData {
   final IconData icon;
   final String label;
-  final List<Color> gradientColors;
   final VoidCallback onTap;
 
   const _QuickActionData({
     required this.icon,
     required this.label,
-    required this.gradientColors,
     required this.onTap,
   });
 }
@@ -1131,15 +1152,13 @@ class _QuickActionButtonState extends State<_QuickActionButton>
                 height: 56,
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(16),
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: widget.data.gradientColors,
+                  color: AppColors.primary.withValues(alpha: 0.10),
+                  border: Border.all(
+                    color: AppColors.primary.withValues(alpha: 0.14),
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: widget.data.gradientColors.first
-                          .withValues(alpha: 0.3),
+                      color: AppColors.primary.withValues(alpha: 0.08),
                       blurRadius: 10,
                       offset: const Offset(0, 4),
                     ),
@@ -1147,7 +1166,7 @@ class _QuickActionButtonState extends State<_QuickActionButton>
                 ),
                 child: Icon(
                   widget.data.icon,
-                  color: Colors.white,
+                  color: AppColors.primary,
                   size: 26,
                 ),
               ),

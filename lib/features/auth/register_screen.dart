@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:lottie/lottie.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/services/api_service.dart';
+import '../../core/services/fcm_service.dart';
 import '../../core/services/storage_service.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -77,6 +78,7 @@ class _RegisterScreenState extends State<RegisterScreen>
       );
       if (!mounted) return;
       await StorageService.saveToken(response.data['token'] as String);
+      await FcmService.instance.registerToken();
       setState(() => _isLoading = false);
       Navigator.pushReplacementNamed(context, '/home');
     } on DioException catch (e) {

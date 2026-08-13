@@ -9,20 +9,22 @@ import '../features/auth/otp_screen.dart';
 import '../features/auth/reset_password_screen.dart';
 import '../features/shell/main_navigation.dart';
 import '../features/notifikasi/notifikasi_screen.dart';
+import '../features/berita/detail_berita_loader_screen.dart';
+import '../features/pendaftaran/detail_pendaftaran_screen.dart';
 
 class AppRoutes {
   AppRoutes._();
 
-  static const splash         = '/';
-  static const onboarding     = '/onboarding';
-  static const login          = '/login';
-  static const register       = '/register';
+  static const splash = '/';
+  static const onboarding = '/onboarding';
+  static const login = '/login';
+  static const register = '/register';
   static const forgotPassword = '/forgot-password';
-  static const otp            = '/otp';
-  static const resetPassword  = '/reset-password';
-  static const home           = '/home';
-  static const notifikasi     = '/notifikasi';
-  static const detailBerita      = '/detail-berita';
+  static const otp = '/otp';
+  static const resetPassword = '/reset-password';
+  static const home = '/home';
+  static const notifikasi = '/notifikasi';
+  static const detailBerita = '/detail-berita';
   static const detailPendaftaran = '/detail-pendaftaran';
 
   static Route<dynamic> generate(RouteSettings settings) {
@@ -44,6 +46,16 @@ class AppRoutes {
         page = const MainNavigation();
       case notifikasi:
         page = const NotifikasiScreen();
+      case detailBerita:
+        final id = _asInt(settings.arguments);
+        page = id == null
+            ? const NotifikasiScreen()
+            : DetailBeritaLoaderScreen(beritaId: id);
+      case detailPendaftaran:
+        final id = _asInt(settings.arguments);
+        page = id == null
+            ? const NotifikasiScreen()
+            : DetailPendaftaranScreen(pendaftaranId: id);
       default:
         page = const SplashScreen();
     }
@@ -52,5 +64,11 @@ class AppRoutes {
       return MaterialPageRoute(builder: (_) => page, settings: settings);
     }
     return AppRoute(page: page, settings: settings);
+  }
+
+  static int? _asInt(Object? value) {
+    if (value is int) return value;
+    if (value is String) return int.tryParse(value);
+    return int.tryParse(value?.toString() ?? '');
   }
 }

@@ -117,13 +117,11 @@ class _BeritaScreenState extends State<BeritaScreen>
     if (_isLoading) {
       return Scaffold(
         backgroundColor: AppColors.backgroundLight,
-        body: SafeArea(
-          child: Column(
-            children: [
-              _buildAppBar(),
-              Expanded(child: _buildShimmerState()),
-            ],
-          ),
+        body: Column(
+          children: [
+            _buildAppBar(),
+            Expanded(child: SafeArea(top: false, child: _buildShimmerState())),
+          ],
         ),
       );
     }
@@ -131,13 +129,11 @@ class _BeritaScreenState extends State<BeritaScreen>
     if (_hasError) {
       return Scaffold(
         backgroundColor: AppColors.backgroundLight,
-        body: SafeArea(
-          child: Column(
-            children: [
-              _buildAppBar(),
-              Expanded(child: _buildErrorState()),
-            ],
-          ),
+        body: Column(
+          children: [
+            _buildAppBar(),
+            Expanded(child: SafeArea(top: false, child: _buildErrorState())),
+          ],
         ),
       );
     }
@@ -148,12 +144,17 @@ class _BeritaScreenState extends State<BeritaScreen>
 
     return Scaffold(
       backgroundColor: AppColors.backgroundLight,
-      body: SafeArea(
-        child: Column(
-          children: [
-            _buildAppBar(),
-            Expanded(
+      body: Column(
+        children: [
+          _buildAppBar(),
+          Expanded(
+            child: RefreshIndicator(
+              color: AppColors.primary,
+              onRefresh: () => _fetchBerita(1),
               child: CustomScrollView(
+                physics: const AlwaysScrollableScrollPhysics(
+                  parent: BouncingScrollPhysics(),
+                ),
                 slivers: [
                   SliverToBoxAdapter(child: _buildSearchBar()),
                   SliverToBoxAdapter(child: _buildFilterRow()),
@@ -185,12 +186,16 @@ class _BeritaScreenState extends State<BeritaScreen>
                     SliverFillRemaining(child: _buildEmptyState()),
                   if (_currentPage < _lastPage)
                     SliverToBoxAdapter(child: _buildLoadMoreButton()),
-                  const SliverToBoxAdapter(child: SizedBox(height: 24)),
+                  SliverToBoxAdapter(
+                    child: SizedBox(
+                      height: 88 + MediaQuery.of(context).padding.bottom,
+                    ),
+                  ),
                 ],
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -209,11 +214,12 @@ class _BeritaScreenState extends State<BeritaScreen>
           end: Alignment.bottomRight,
           colors: [Color(0xFF1F3B61), Color(0xFF2D5A9B)],
         ),
+        borderRadius: BorderRadius.vertical(bottom: Radius.circular(22)),
       ),
       child: SafeArea(
         bottom: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+          padding: const EdgeInsets.fromLTRB(20, 10, 16, 18),
           child: Row(
             children: [
               Expanded(
@@ -226,36 +232,36 @@ class _BeritaScreenState extends State<BeritaScreen>
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
                         color: Colors.white,
+                        letterSpacing: -0.2,
                       ),
                     ),
+                    const SizedBox(height: 2),
                     Text(
                       'Informasi terkini dari sekolah',
                       style: GoogleFonts.plusJakartaSans(
                         fontSize: 12,
-                        color: Colors.white.withValues(alpha: 0.6),
+                        color: Colors.white.withValues(alpha: 0.65),
                       ),
                     ),
                   ],
                 ),
               ),
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.12),
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.2),
+              Material(
+                color: Colors.white.withValues(alpha: 0.12),
+                shape: const CircleBorder(),
+                clipBehavior: Clip.antiAlias,
+                child: InkWell(
+                  onTap: () => _fetchBerita(1),
+                  customBorder: const CircleBorder(),
+                  child: const SizedBox(
+                    width: 40,
+                    height: 40,
+                    child: Icon(
+                      Icons.refresh_rounded,
+                      color: Colors.white,
+                      size: 20,
+                    ),
                   ),
-                ),
-                child: IconButton(
-                  padding: EdgeInsets.zero,
-                  icon: const Icon(
-                    Icons.bookmark_border_rounded,
-                    color: Colors.white,
-                    size: 20,
-                  ),
-                  onPressed: () {},
                 ),
               ),
             ],
