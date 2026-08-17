@@ -4,6 +4,7 @@ import 'package:lottie/lottie.dart';
 import 'package:shimmer/shimmer.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/services/notification_local_service.dart';
+import '../../core/widgets/notification_popup_overlay.dart';
 import 'notifikasi_model.dart';
 import 'notifikasi_service.dart';
 
@@ -125,6 +126,18 @@ class _NotifikasiScreenState extends State<NotifikasiScreen>
     try {
       await NotifikasiService.markRead(notif.id);
       await NotificationLocalService.instance.refreshUnreadBadge();
+      
+      if (mounted) {
+        NotificationPopupOverlay.show(
+          context,
+          title: 'Notifikasi dibaca',
+          message: notif.judul,
+          icon: notif.icon,
+          iconColor: notif.iconColor,
+          duration: const Duration(seconds: 2),
+          onTap: () => _navigateByType(notif),
+        );
+      }
     } catch (_) {
       // Rollback jika gagal
       if (mounted) {
@@ -132,10 +145,19 @@ class _NotifikasiScreenState extends State<NotifikasiScreen>
           final idx = _items.indexWhere((n) => n.id == notif.id);
           if (idx != -1) _items[idx] = _items[idx].copyWith(dibaca: false);
         });
+        NotificationPopupOverlay.show(
+          context,
+          title: 'Gagal membaca notifikasi',
+          message: 'Silakan coba lagi',
+          icon: Icons.error_outline_rounded,
+          iconColor: AppColors.danger,
+        );
       }
     }
 
-    _navigateByType(notif);
+    if (notif.dibaca) {
+      _navigateByType(notif);
+    }
   }
 
   Future<void> _markAllRead() async {
@@ -146,8 +168,28 @@ class _NotifikasiScreenState extends State<NotifikasiScreen>
     try {
       await NotifikasiService.markAllRead();
       await NotificationLocalService.instance.refreshUnreadBadge();
+      
+      if (mounted) {
+        NotificationPopupOverlay.show(
+          context,
+          title: 'Semua notifikasi sudah dibaca',
+          message: 'Inbox Anda bersih',
+          icon: Icons.mark_email_read_rounded,
+          iconColor: AppColors.primary,
+          duration: const Duration(seconds: 2),
+        );
+      }
     } catch (_) {
       // Silent fail — refresh untuk sync
+      if (mounted) {
+        NotificationPopupOverlay.show(
+          context,
+          title: 'Gagal memperbarui',
+          message: 'Silakan coba lagi',
+          icon: Icons.error_outline_rounded,
+          iconColor: AppColors.danger,
+        );
+      }
       await _loadNotifikasi(refresh: true);
     }
   }
@@ -161,9 +203,27 @@ class _NotifikasiScreenState extends State<NotifikasiScreen>
     try {
       await NotifikasiService.delete(notif.id);
       await NotificationLocalService.instance.refreshUnreadBadge();
+      
+      if (mounted) {
+        NotificationPopupOverlay.show(
+          context,
+          title: 'Notifikasi dihapus',
+          message: notif.judul,
+          icon: Icons.delete_outline_rounded,
+          iconColor: AppColors.danger,
+          duration: const Duration(seconds: 2),
+        );
+      }
     } catch (_) {
       // Rollback jika gagal hapus di server
       if (!mounted) return;
+      NotificationPopupOverlay.show(
+        context,
+        title: 'Gagal menghapus',
+        message: 'Silakan coba lagi',
+        icon: Icons.error_outline_rounded,
+        iconColor: AppColors.danger,
+      );
       await _loadNotifikasi(refresh: true);
     }
   }
@@ -769,81 +829,97 @@ class _NotifCard extends StatelessWidget {
                 ),
                 child: Icon(item.icon, color: item.iconColor, size: 22),
               ),
-              const SizedBox(width: 12),
-              // Content
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            item.judul,
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 14,
-                              fontWeight: item.dibaca
-                                  ? FontWeight.w600
-                                  : FontWeight.bold,
-                              color: AppColors.textPrimary,
-                            ),
-                          ),
-                        ),
-                        if (!item.dibaca)
-                          Container(
-                            width: 8,
-                            height: 8,
-                            decoration: const BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: AppColors.gold,
-                            ),
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      item.pesan,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 12,
-                        color: AppColors.textSecondary,
-                        height: 1.5,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        // Kategori badge
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: item.iconColor.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(999),
-                          ),
-                          child: Text(
-                            item.kategoriLabel,
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w700,
-                              color: item.iconColor,
-                            ),
-                          ),
-                        ),
-                        const Spacer(),
-                        const Icon(Icons.access_time_rounded,
-                            size: 11, color: AppColors.textLight),
-                        const SizedBox(width: 3),
-                        Text(
-                          _formatTime(item.createdAt),
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 11,
-                            color: AppColors.textLight,
-                          ),
-                        ),
-                      ],
-                    ),
+               const SizedBox(width: 14),
+               // Content
+               Expanded(
+                 child: Column(
+                   crossAxisAlignment: CrossAxisAlignment.start,
+                   children: [
+                     Row(
+                       children: [
+                         Expanded(
+                           child: Text(
+                             item.judul,
+                             maxLines: 1,
+                             overflow: TextOverflow.ellipsis,
+                             style: GoogleFonts.plusJakartaSans(
+                               fontSize: 14,
+                               fontWeight: item.dibaca
+                                   ? FontWeight.w600
+                                   : FontWeight.bold,
+                               color: AppColors.textPrimary,
+                             ),
+                           ),
+                         ),
+                         if (!item.dibaca) ...[
+                           const SizedBox(width: 6),
+                           Container(
+                             width: 10,
+                             height: 10,
+                             decoration: BoxDecoration(
+                               shape: BoxShape.circle,
+                               color: AppColors.gold,
+                               boxShadow: [
+                                 BoxShadow(
+                                   color: AppColors.gold.withValues(alpha: 0.4),
+                                   blurRadius: 4,
+                                 ),
+                               ],
+                             ),
+                           ),
+                         ],
+                       ],
+                     ),
+                     const SizedBox(height: 6),
+                     Text(
+                       item.pesan,
+                       maxLines: 2,
+                       overflow: TextOverflow.ellipsis,
+                       style: GoogleFonts.plusJakartaSans(
+                         fontSize: 13,
+                         color: AppColors.textSecondary,
+                         height: 1.4,
+                         fontWeight: FontWeight.w500,
+                       ),
+                     ),
+                     const SizedBox(height: 10),
+                     Row(
+                       children: [
+                         Container(
+                           padding: const EdgeInsets.symmetric(
+                               horizontal: 10, vertical: 4),
+                           decoration: BoxDecoration(
+                             color: item.iconColor.withValues(alpha: 0.12),
+                             borderRadius: BorderRadius.circular(20),
+                             border: Border.all(
+                               color: item.iconColor.withValues(alpha: 0.2),
+                               width: 0.5,
+                             ),
+                           ),
+                           child: Text(
+                             item.kategoriLabel,
+                             style: GoogleFonts.plusJakartaSans(
+                               fontSize: 11,
+                               fontWeight: FontWeight.w700,
+                               color: item.iconColor,
+                               letterSpacing: 0.3,
+                             ),
+                           ),
+                         ),
+                         const Spacer(),
+                         Icon(Icons.access_time_rounded,
+                             size: 12, color: AppColors.textLight),
+                         const SizedBox(width: 4),
+                         Text(
+                           _formatTime(item.createdAt),
+                           style: GoogleFonts.plusJakartaSans(
+                             fontSize: 11,
+                             color: AppColors.textLight,
+                             fontWeight: FontWeight.w500,
+                           ),
+                         ),
+                       ],
+                     ),
                   ],
                 ),
               ),

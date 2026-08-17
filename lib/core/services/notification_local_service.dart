@@ -178,6 +178,9 @@ class NotificationLocalService with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       checkForNewNotifications();
+      startPolling();
+    } else if (state == AppLifecycleState.paused) {
+      stopPolling();
     }
   }
 
@@ -308,7 +311,11 @@ class NotificationLocalService with WidgetsBindingObserver {
   Future<List<int>> _getShownIds() async {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getStringList(_prefShownKey) ?? [];
-    return raw.map((s) => int.tryParse(s) ?? -1).toList();
+    var ids = raw.map((s) => int.tryParse(s) ?? -1).toList();
+    if (ids.length > 500) {
+      ids = ids.sublist(ids.length - 500);
+    }
+    return ids;
   }
 
   Future<void> _saveShownIds(List<int> ids) async {

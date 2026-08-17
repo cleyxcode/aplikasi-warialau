@@ -1,3 +1,5 @@
+import '../../core/constants/app_constants.dart';
+
 class GuruModel {
   final int id;
   final String nama;
@@ -36,8 +38,7 @@ class GuruModel {
 
   String get fotoUrl {
     if (foto == null) return '';
-    const base = 'http://127.0.0.1:8000/storage/';
-    return '$base$foto';
+    return AppConstants.imageUrl(foto);
   }
 
   String get initials {
