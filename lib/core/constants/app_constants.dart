@@ -1,14 +1,14 @@
 /// Konfigurasi URL API.
 ///
-/// Default: web lokal via Laravel Sail (10.0.2.2 = host dari emulator Android).
-/// Override saat build production:
-/// ```bash
-/// flutter build apk --dart-define=API_BASE_HOST=https://sdnegeriwailau.site
-/// ```
+  /// Default: URL production yang sudah di-deploy.
+  /// Override saat build lokal:
+  /// ```bash
+  /// flutter run --dart-define=API_BASE_HOST=http://10.0.2.2:8000
+  /// ```
 class AppConstants {
   static const String _baseHost = String.fromEnvironment(
     'API_BASE_HOST',
-    defaultValue: 'http://10.0.2.2:8000',
+    defaultValue: 'https://mediumorchid-quail-508400.hostingersite.com',
   );
 
   /// Domain publik resmi (dokumentasi / deep link web).
